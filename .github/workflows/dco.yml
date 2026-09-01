@@ -1,3 +1,4 @@
+# (re-registered 2026-09-01)
 name: DCO
 on:
   pull_request:
