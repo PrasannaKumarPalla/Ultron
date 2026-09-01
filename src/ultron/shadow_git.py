@@ -8,10 +8,13 @@ fast-forwards main, a red one rolls the workspace back to baseline.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 MAIN_BRANCH = "main"
 CANDIDATE_BRANCH = "ultron-candidate"
@@ -118,12 +121,17 @@ class ShadowGit:
         base = f"{MAIN_BRANCH}...{CANDIDATE_BRANCH}"
         code, out = self._git("diff", "--name-only", base)
         if code != 0:
+            logger.warning("shadow-git diff --name-only %s failed (%d): %s", base, code, out.strip())
             return []
         return [line for line in out.splitlines() if line.strip()]
 
     def diff_stat(self) -> str:
-        code, out = self._git("diff", "--stat", f"{MAIN_BRANCH}...{CANDIDATE_BRANCH}")
-        return out.strip() if code == 0 else ""
+        base = f"{MAIN_BRANCH}...{CANDIDATE_BRANCH}"
+        code, out = self._git("diff", "--stat", base)
+        if code != 0:
+            logger.warning("shadow-git diff --stat %s failed (%d): %s", base, code, out.strip())
+            return ""
+        return out.strip()
 
     def begin_variant(self, tag: str) -> str:
         """Isolate one speculative candidate on its own branch at baseline."""

@@ -145,3 +145,12 @@ def test_mission_events_mirror_spills_large_payloads(tmp_path):
     # events() transparently rehydrates it
     got = repo.events(run_id)[-1].payload
     assert got == big
+
+
+def test_event_timeline_returns_parsed_datetimes(tmp_path):
+    from datetime import datetime
+
+    repo, run_id = make_repo(tmp_path)
+    repo.append_run_event(run_id, "log", "runtime", {"x": 1})
+    timeline = repo.event_timeline(run_id)
+    assert timeline and isinstance(timeline[0]["ts"], datetime)
