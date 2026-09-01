@@ -26,3 +26,5 @@ api_key.txt
 CLAUDE.md
 MEMORY.md
 .claude/
+/sem.err
+/sem.json

@@ -1,0 +1,31 @@
+name: _bujji-triage
+on:
+  push:
+    branches: [chore/bujji-into-gate-27]
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: semgrep scan --config p/default --skip-unknown-extensions --json --output findings.json src/bujji || true
+      - run: |
+          python - <<'PY'
+          import json, collections
+          d = json.load(open("findings.json"))
+          r = d["results"]
+          print("TOTAL", len(r))
+          by_rule = collections.Counter(x["check_id"] for x in r)
+          for rid, n in by_rule.most_common():
+              print(f"{n:3}  {rid}")
+          print("\n--- locations ---")
+          for x in sorted(r, key=lambda x: (x["check_id"], x["path"], x["start"]["line"])):
+              print(f'{x["path"]}:{x["start"]["line"]}  {x["extra"]["severity"]:8}  {x["check_id"]}')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bujji-findings
+          path: findings.json
