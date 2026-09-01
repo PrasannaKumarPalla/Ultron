@@ -52,36 +52,37 @@ def test_installed_models_parses_ollama_payload(monkeypatch):
     assert bootstrap.installed_models() == ["a:1", "b:2"]
 
 
+class _FakeBody:
+    """Minimal stand-in for the downloader's HTTP response object."""
+
+    def __init__(self, body: bytes):
+        self._buf = memoryview(body)
+        self._pos = 0
+        self.status = 200
+        self.headers = {"Content-Length": str(len(body))}
+
+    def read(self, n: int) -> bytes:
+        chunk = bytes(self._buf[self._pos : self._pos + n])
+        self._pos += len(chunk)
+        return chunk
+
+    def close(self) -> None:
+        pass
+
+
 def test_installer_download_writes_and_returns_path(tmp_path, monkeypatch):
+    from ultron import downloader
+
     payload = b"\x00" * 6_000_000
-
-    class _Fake:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_):
-            return False
-
-        def read(self):
-            return payload
-
-    monkeypatch.setattr(bootstrap.urllib.request, "urlopen", lambda *a, **k: _Fake())
+    monkeypatch.setattr(downloader, "_open", lambda *_a, **_k: _FakeBody(payload))
     dest = bootstrap.download_ollama_installer(tmp_path / "d")
     assert dest.exists() and dest.stat().st_size == len(payload)
 
 
 def test_installer_download_rejects_truncated(tmp_path, monkeypatch):
-    class _Fake:
-        def __enter__(self):
-            return self
+    from ultron import downloader
 
-        def __exit__(self, *_):
-            return False
-
-        def read(self):
-            return b"tiny"
-
-    monkeypatch.setattr(bootstrap.urllib.request, "urlopen", lambda *a, **k: _Fake())
+    monkeypatch.setattr(downloader, "_open", lambda *_a, **_k: _FakeBody(b"tiny"))
     try:
         bootstrap.download_ollama_installer(tmp_path / "d")
     except bootstrap.DownloadFailed:

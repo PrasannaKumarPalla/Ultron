@@ -63,20 +63,24 @@ def installed_models() -> list[str]:
     return [entry["name"] for entry in payload.get("models", []) if entry.get("name")]
 
 
-def download_ollama_installer(dest_dir: Path) -> Path:
-    dest_dir.mkdir(parents=True, exist_ok=True)
+def download_ollama_installer(dest_dir: Path, on_progress=None) -> Path:
+    """Fetch OllamaSetup.exe. Streamed, resumable, retried (see ultron.downloader).
+
+    Ollama does not publish a stable per-release checksum URL, so integrity here
+    rests on HTTPS plus a minimum-size guard; `on_progress` receives
+    `ultron.downloader.Progress` updates for a UI.
+    """
+    from ultron import downloader
+
     dest = dest_dir / "OllamaSetup.exe"
     logging.info("Downloading Ollama installer to %s", dest)
     try:
-        # OLLAMA_INSTALLER_URL is a module-level https:// constant; the flag is on urlopen(dynamic).
-        with urllib.request.urlopen(OLLAMA_INSTALLER_URL, timeout=60) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            data = response.read()
-        dest.write_bytes(data)
-    except OSError as exc:
+        return downloader.download(
+            OLLAMA_INSTALLER_URL, dest,
+            min_bytes=5_000_000, on_progress=on_progress,
+        )
+    except downloader.DownloadError as exc:
         raise DownloadFailed(f"Could not download Ollama installer: {exc}") from exc
-    if dest.stat().st_size < 5_000_000:
-        raise DownloadFailed("Ollama installer download looks truncated.")
-    return dest
 
 
 def install_ollama_silently(installer: Path) -> None:
