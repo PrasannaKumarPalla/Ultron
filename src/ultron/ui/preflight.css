@@ -1,0 +1,106 @@
+/* First-run prerequisite screen. Pairs with preflight.js. */
+
+#preflightDialog {
+  width: min(620px, 94vw);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #11141b;
+  color: var(--text);
+}
+#preflightDialog::backdrop {
+  background: #050609e6;
+  backdrop-filter: blur(5px);
+}
+#preflightDialog .modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 22px 24px 0;
+}
+#preflightDialog .modal-head h2 { margin: 2px 0 0; }
+#preflightBody { padding: 14px 24px 24px; }
+
+.pf-machine {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: .01em;
+  margin: 6px 0 4px;
+}
+.pf-rec {
+  font-size: 13px;
+  color: var(--text);
+  margin: 4px 0 14px;
+}
+.pf-rec code {
+  background: #1c2027;
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.pf-list { list-style: none; margin: 0; padding: 0; }
+.pf-req {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.pf-req:first-child { border-top: 0; }
+.pf-req > div { flex: 1; min-width: 0; }
+.pf-req strong { display: block; font-size: 14px; }
+.pf-req small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.pf-mark {
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+.pf-ok .pf-mark { background: #1c3a30; color: var(--green); }
+.pf-missing .pf-mark { background: #2a2e35; color: var(--muted); }
+.pf-insufficient .pf-mark { background: #3a2530; color: var(--red); }
+.pf-unknown .pf-mark { background: #2a2e35; color: var(--muted); }
+
+.pf-action { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pf-run { white-space: nowrap; }
+.pf-size { opacity: .7; font-weight: 400; margin-left: 4px; }
+
+.pf-progress { width: 180px; }
+.pf-bar {
+  height: 6px;
+  background: #2a2e35;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pf-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--blue);
+  transition: width .3s ease;
+}
+.pf-status {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+  text-align: right;
+}
+
+.pf-note {
+  color: var(--amber);
+  font-size: 12.5px;
+  margin: 12px 0 0;
+}
+
+.pf-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.pf-hint { color: var(--muted); font-size: 12.5px; }

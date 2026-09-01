@@ -24,6 +24,11 @@
   4. `desktop_app.bootstrap_ollama_and_models()` is now driven by the report:
      overridable warnings on low RAM / disk, resumable Ollama install, and an
      offer to pull the **hardware-matched** recommended model with its real size.
+  5. `src/ultron/ui/preflight.{js,css}` — an in-app first-run screen: the shell
+     dashboard shows a blocking dialog on load when the report is not ready (or
+     once when it is ready-but-degraded), each install action streams progress
+     from the SSE endpoint, and it closes when the machine is ready. Self-
+     contained, dependency-free, loads before app.js.
 - **Rejected:**
   - Bundle every dependency in the installer — multi-GB installer, and models
     move faster than releases.
@@ -32,5 +37,6 @@
   - The installer stays small; first run needs network.
   - A small hand-maintained model matrix (`preflight._RECOMMENDABLE`: tag, size,
     VRAM floor) must track the models we actually offer.
-  - Still open: an in-app first-run **screen** (the current UX is the desktop
-    shell's message boxes). The `/api/preflight*` endpoints exist for it.
+  - The desktop message-box flow and the in-app screen coexist: the shell handles
+    the case where Ollama itself is missing (before the server is up); the screen
+    covers everything once the UI has loaded.
