@@ -165,13 +165,22 @@ async def lifespan(app: FastAPI):
     _background_tasks.append(asyncio.create_task(MODEL_POOL.warm([settings.default_model])))
 
     async def _nightly_consolidation() -> None:
-        memory = LayeredMemory(Repository(settings.database_path))
+        repo_bg = Repository(settings.database_path)
+        memory = LayeredMemory(repo_bg)
         while True:
             await asyncio.sleep(settings.consolidation_interval_s)
             try:
                 memory.consolidate()
             except Exception:
                 logging.getLogger(__name__).exception("memory consolidation failed")
+            try:
+                swept = await asyncio.to_thread(repo_bg.gc_blobs)
+                if swept["deleted"]:
+                    logging.getLogger(__name__).info(
+                        "blob GC: freed %d bytes across %d blobs (%d kept)",
+                        swept["freed_bytes"], swept["deleted"], swept["kept"])
+            except Exception:
+                logging.getLogger(__name__).exception("blob GC failed")
 
     _background_tasks.append(asyncio.create_task(_nightly_consolidation()))
 
