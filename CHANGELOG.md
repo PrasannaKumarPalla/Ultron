@@ -3,6 +3,25 @@
 All notable changes are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.1] - 2026-09-01
+
+### Added
+- Prerequisite preflight (ADR 0012): `GET /api/preflight` machine report
+  (OS / arch / RAM / VRAM / GPU / free disk / Ollama state / installed models)
+  and `POST /api/preflight/install` (SSE) for consented installs.
+- In-app first-run screen: a blocking dialog that lists what is missing, installs
+  Ollama and pulls the hardware-matched model with live progress, and closes when
+  the machine is ready.
+- Resumable, checksum-verified downloads (`ultron.downloader`) with HTTP Range
+  resume and bounded retry; the Ollama installer now uses it.
+
+### Changed
+- Desktop first-run is driven by the preflight report: overridable warnings on low
+  RAM / disk, and it offers the recommended model for the detected hardware rather
+  than one hardcoded tag.
+- Win32 GPU detection no longer reports a VRAM figure from `AdapterRAM` (unreliable
+  on modern cards); only `nvidia-smi` VRAM is trusted.
+
 ## [0.1.0] - 2026-09-01
 
 First public release.
