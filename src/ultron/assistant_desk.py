@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 _FALLBACK_WAKE_VARIANTS = ("assistant", "bujji", "buji", "budgie", "boujie")
 
 _MISSION_RE = re.compile(
-    r"^\s*(?:please\s+)?(?:start|launch|begin|kick\s+off|run)\s+(?:a\s+|an\s+|the\s+)?mission"
-    r"(?:\s+(?:called|titled|named|for))?\s+(?P<title>.+?)\s*$",
+    r"^\s*(?:please\s+)?(?:start|launch|begin|kick\s+off|run)\s+(?:an?\s+|the\s+)?mission"
+    r"(?:\s+(?:called|titled|named|for))?\s+(?P<title>\S.*)$",
     re.IGNORECASE,
 )
 
@@ -85,7 +85,7 @@ def strip_wake_word(transcript: str, wake_word: str = "assistant") -> str | None
 
 
 def classify_utterance(utterance: str) -> DeskDecision:
-    match = _MISSION_RE.match(utterance)
+    match = _MISSION_RE.match(utterance[:2000])
     if match:
         title = match.group("title").strip()
         if title:
