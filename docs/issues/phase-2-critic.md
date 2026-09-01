@@ -1,5 +1,8 @@
 # Phase 2 Critic Pass — 2026-08-25
 
+> **Status: fully resolved (2026-09-01).** Filed items #21–#24 are fixed and
+> merged to `main`; the issues are closed. Kept as the historical record.
+
 Scope: repo_intel, sandbox, speculative search + workflow integration,
 bench_tasks. Findings ranked by impact; fixed items marked.
 
