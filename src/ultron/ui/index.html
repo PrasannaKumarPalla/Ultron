@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ultron — Local AI Studio</title><meta name="description" content="Your local autonomous AI engineering studio"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/ultron-light-32.png"><link rel="apple-touch-icon" href="/assets/icons/ultron-light-180.png"><link rel="manifest" href="/assets/site.webmanifest"><link rel="stylesheet" href="/assets/styles.css"><link rel="stylesheet" href="/assets/team.css"><link rel="stylesheet" href="/assets/onboarding.css"><link rel="stylesheet" href="/assets/icon.css"><link rel="stylesheet" href="/assets/chat.css"><link rel="stylesheet" href="/assets/preflight.css"></head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><div class="mark"><img src="/assets/icons/ultron-light-64.png" alt=""></div><div><strong>ULTRON</strong><span>LOCAL AI STUDIO</span></div></div>
+    <nav><button class="nav active" data-view="command"><span>⌁</span>Command center</button><button class="nav" data-view="chat"><span>💬</span>Chat</button><button class="nav" data-view="bujji"><span>◈</span>Bujji Core</button><button class="nav" data-view="projects"><span>▦</span>Workspaces</button><button class="nav" data-view="memory"><span>◉</span>Memory</button><button class="nav" data-view="approvals"><span>◇</span>Approvals <b id="approvalBadge">0</b></button></nav>
+    <div class="rail-bottom"><div class="system"><i id="healthDot"></i><div><strong id="systemLabel">Connecting</strong><span id="modelLabel">Local runtime</span><select id="providerSwitcher" aria-label="AI provider"><option value="local">Local LLM (Ollama)</option><option value="hosted">OmniRoute (free cloud)</option></select><select id="modelSwitcher" aria-label="Active AI model"></select></div></div><button class="nav" id="openDocs"><span>?</span>API reference</button></div>
+  </aside>
+  <main>
+    <header><button id="mobileMenu" aria-label="Open navigation">☰</button><div><p class="kicker" id="pageKicker">OPERATIONS</p><h1 id="pageTitle">Command center</h1></div><div class="header-actions"><button class="ghost" id="refresh">↻ Refresh</button><button class="ghost" id="browseWorkspace">⌕ Browse folder</button><button class="primary" id="createProject">＋ New workspace</button></div></header>
+    <section id="commandView" class="view active">
+      <div class="hero"><div><span class="statusline"><i></i> Ultron is online</span><h2>Your engineering studio,<br><em>thinking locally.</em></h2><p>Select a workspace folder, describe your project, and watch Ultron assemble and coordinate the specialist team.</p><button class="primary large" id="heroCreate">＋ Create project</button><button class="ghost large" id="heroProjects">Select workspace</button></div><div class="orb"><div class="orbit one"></div><div class="orbit two"></div><div class="core"><img src="/assets/icons/ultron-light-192.png" alt="Ultron"></div></div></div>
+      <div class="metrics"><article><span>Projects</span><strong id="projectCount">0</strong><small>isolated workspaces</small></article><article><span>Missions</span><strong id="missionCount">0</strong><small id="activeMissionCount">0 active</small></article><article><span>Memory</span><strong id="memoryCount">0</strong><small>governed records</small></article><article><span>Runtime</span><strong class="runtime">LOCAL</strong><small id="runtimeState">checking model</small></article></div>
+      <div class="section-head"><div><p class="kicker">AGENT ORGANIZATION</p><h2>Your specialist team</h2></div><span class="subtle">Automatic handoffs through LangGraph</span></div><div id="roleGrid" class="roles"></div>
+      <div class="section-head"><div><p class="kicker">RECENT WORK</p><h2>Projects</h2></div></div><div id="recentMissions" class="mission-list"></div>
+    </section>
+    <section id="chatView" class="view">
+      <div class="chat-shell">
+        <aside class="chat-sidebar">
+          <div class="chat-sidebar-head">
+            <select id="chatProject"></select>
+            <button class="primary" id="chatNewSession">＋ New chat</button>
+          </div>
+          <div class="chat-filter"><label><input type="checkbox" id="chatShowArchived"> Show archived</label></div>
+          <div id="chatSessionList" class="chat-session-list"></div>
+        </aside>
+        <div class="chat-main">
+          <div class="chat-toolbar">
+            <div><strong>Conversation</strong><span id="chatModelStatus">Choose the model for new messages</span></div>
+            <label for="chatModelSwitcher">Model</label>
+            <select id="chatModelSwitcher" aria-label="Chat AI model"></select>
+          </div>
+          <div id="chatThread" class="chat-thread"><div class="empty-state"><span>💬</span><h3>No chat selected</h3><p>Create or open a chat session to start talking with Ultron.</p></div></div>
+          <form id="chatForm" class="chat-input-row">
+            <textarea id="chatInput" placeholder="Ask Ultron anything… it can search the web, read/write files, run commands, and manage missions." rows="2"></textarea>
+            <button class="primary" type="submit" id="chatSend">Send</button>
+          </form>
+        </div>
+      </div>
+    </section>
+    <section id="bujjiView" class="view bujji-core-view">
+      <div class="bujji-core-frame">
+        <iframe id="bujjiCoreFrame" allow="microphone; autoplay; fullscreen" title="Bujji Control Core"></iframe>
+        <div class="bujji-core-actions"><span class="bujji-provider-pill" id="bujjiProviderPill">Provider: Local</span><button class="ghost" id="bujjiCoreFull" title="Toggle fullscreen">⛶ Fullscreen</button><button class="ghost" id="bujjiCoreReload" title="Reload Bujji Control Core">↻ Reload</button></div>
+      </div>
+    </section>
+    <section id="projectsView" class="view"><div class="split"><div><div class="section-head"><div><p class="kicker">WORKSPACES</p><h2>Workspaces</h2></div></div><div id="projectList" class="project-list"></div></div><div id="projectDetail" class="detail empty"><div class="empty-state"><span>▦</span><h3>Select a workspace</h3><p>Open a folder workspace to create projects, inspect events, and manage its memory.</p></div></div></div></section>
+    <section id="memoryView" class="view"><div class="section-head"><div><p class="kicker">SECONDARY BRAIN</p><h2>Project memory</h2><p class="subtle">Decisions and preferences stay scoped to their project.</p></div><button class="primary" id="addMemory">＋ Add memory</button></div><div class="filter-row"><select id="memoryProject"></select></div><div id="memoryList" class="memory-list"></div></section>
+    <section id="approvalsView" class="view"><div class="section-head"><div><p class="kicker">GOVERNANCE</p><h2>Approval inbox</h2><p class="subtle">Review risky actions before agents continue.</p></div></div><div id="approvalList" class="approval-list"></div></section>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+<dialog id="modal"><form id="modalForm"><div class="modal-head"><div><p class="kicker" id="modalKicker"></p><h2 id="modalTitle"></h2></div><button type="button" class="icon" id="modalClose">×</button></div><div id="modalBody"></div><p id="modalError" class="error"></p><div class="modal-actions"><button type="button" class="ghost" id="modalCancel">Cancel</button><button class="primary" id="modalSubmit">Save</button></div></form></dialog>
+<script src="/assets/chat.js"></script>
+
+<dialog id="preflightDialog"><div class="modal-head"><div><p class="kicker">FIRST RUN</p><h2>Before you start</h2></div></div><div id="preflightBody"></div></dialog><script src="/assets/preflight.js"></script><script src="/assets/app.js"></script></body></html>

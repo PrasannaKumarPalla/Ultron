@@ -1,0 +1,83 @@
+{
+  "phase": "2",
+  "generated_at": "2026-08-25T13:54:42.902947+00:00",
+  "fixtures": [
+    {
+      "fixture": "green-after-seed",
+      "baseline_beam1": {
+        "outcome": "COMPLETED",
+        "wall_ms": 4834.8,
+        "events": 38,
+        "developer_calls": 1,
+        "test_cycles": 2
+      },
+      "speculative_beam2": {
+        "outcome": "COMPLETED",
+        "wall_ms": 6102.0,
+        "events": 41,
+        "developer_calls": 2,
+        "test_cycles": 2
+      },
+      "overhead_ms": 1267.2,
+      "cycle_delta": 0
+    },
+    {
+      "fixture": "repair-rescued-by-speculation",
+      "baseline_beam1": {
+        "outcome": "FAILED",
+        "wall_ms": 4495.3,
+        "events": 38,
+        "developer_calls": 1,
+        "test_cycles": 2
+      },
+      "speculative_beam2": {
+        "outcome": "COMPLETED",
+        "wall_ms": 6048.0,
+        "events": 41,
+        "developer_calls": 2,
+        "test_cycles": 2
+      },
+      "overhead_ms": 1552.7,
+      "cycle_delta": 0
+    },
+    {
+      "fixture": "fan-out-overhead",
+      "baseline_beam1": {
+        "outcome": "COMPLETED",
+        "wall_ms": 5125.5,
+        "events": 38,
+        "developer_calls": 1,
+        "test_cycles": 2
+      },
+      "speculative_beam2": {
+        "outcome": "COMPLETED",
+        "wall_ms": 5998.6,
+        "events": 41,
+        "developer_calls": 2,
+        "test_cycles": 2
+      },
+      "overhead_ms": 873.1,
+      "cycle_delta": 0
+    },
+    {
+      "fixture": "exhausted-repairs",
+      "baseline_beam1": {
+        "outcome": "FAILED",
+        "wall_ms": 4439.3,
+        "events": 38,
+        "developer_calls": 1,
+        "test_cycles": 2
+      },
+      "speculative_beam2": {
+        "outcome": "FAILED",
+        "wall_ms": 5631.6,
+        "events": 41,
+        "developer_calls": 2,
+        "test_cycles": 2
+      },
+      "overhead_ms": 1192.3,
+      "cycle_delta": 0
+    }
+  ],
+  "healthy": true
+}

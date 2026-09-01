@@ -1,0 +1,40 @@
+name: Semgrep SAST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # Blocking gate: the maintained surface only. Intentional findings carry an
+  # inline `# nosemgrep: <rule>` with a reason. No baseline to bump.
+  semgrep:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Scan src/ultron
+        run: semgrep scan --config p/default --error --skip-unknown-extensions src/ultron
+
+  # Weekly full-tree audit, informational. src/bujji (the absorbed code-execution
+  # subsystem) carries a large inherent p/default backlog — eval/exec/subprocess
+  # are its function. Tracked for triage, not blocking every PR. See the
+  # "Semgrep triage of src/bujji" issue.
+  audit:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Full-tree scan
+        run: semgrep scan --config p/default --skip-unknown-extensions

@@ -1,0 +1,7 @@
+# CodeQL scope. The blocking-quality surface is src/ultron. The absorbed
+# src/bujji subsystem (a code-execution agent — connectors, routers, channels)
+# has an inherent security-extended backlog; it is triaged separately, not
+# gated on every push. Tests are excluded.
+name: "Ultron CodeQL config"
+paths:
+  - src/ultron

@@ -1,0 +1,36 @@
+{
+  "phase": "1",
+  "generated_at": "2026-08-25T13:22:52.524913+00:00",
+  "event_count": 500,
+  "results": {
+    "append_inline": {
+      "p50_ms": 2.821,
+      "p95_ms": 3.102,
+      "mean_ms": 3.033,
+      "events_per_sec": 329.7
+    },
+    "append_spilled_100kib": {
+      "p50_ms": 3.904,
+      "p95_ms": 5.138,
+      "mean_ms": 3.965,
+      "events_per_sec": 252.2
+    },
+    "replay": {
+      "events": 510,
+      "wall_ms": 142.92,
+      "folded_keys": []
+    },
+    "verify_chain": {
+      "ok": true,
+      "checked": 510,
+      "broken_at": null,
+      "reason": null,
+      "wall_ms": 2.48
+    },
+    "storage": {
+      "db_bytes": 348160,
+      "blob_bytes": 1000240
+    }
+  },
+  "healthy": true
+}

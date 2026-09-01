@@ -1,0 +1,45 @@
+name: Bug report
+description: Something is broken
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Ultron version
+      description: From the app's About, or the installer filename.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU / VRAM (if model-related)
+      placeholder: "RTX 3060 12GB, or 'CPU only'"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: "From the local log file - redact anything sensitive."
+      render: text

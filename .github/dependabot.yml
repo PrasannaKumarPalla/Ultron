@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # Node bridges under the embedded bujji subsystem. Not built in CI, but they
+  # carry live external deps (claude-code SDK, Baileys) and ship with Ultron.
+  - package-ecosystem: "npm"
+    directory: "/src/bujji/agents/claude_code_runner"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "npm"
+    directory: "/src/bujji/channels/whatsapp_baileys_bridge"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
