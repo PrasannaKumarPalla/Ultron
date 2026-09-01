@@ -5,6 +5,14 @@ All notable changes are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-01
+
+### Security
+- Folded `src/bujji` into the blocking Semgrep gate (#27): triaged all 48
+  `p/default` findings — `windows_control` app-launch dropped `shell=True`
+  (`os.startfile` instead, closing an LLM-argument command-injection path),
+  WhatsApp doc-id hash moved to SHA-256, the rest annotated as intentional.
+
 ### Fixed
 - Phase-1/2 critic tech-debt (#13–#24), one PR each:
   - Cancelled/crashed missions no longer strand the workspace on a candidate
