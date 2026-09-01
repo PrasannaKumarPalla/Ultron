@@ -58,3 +58,35 @@ def test_plain_run_handles_missing_binary_and_timeout(tmp_path: Path):
     ok, output = _plain_run([sys.executable, "-c", "import time; time.sleep(30)"],
                             cwd=tmp_path, timeout_s=2)
     assert ok is False
+
+
+def test_child_is_spawned_suspended_then_assigned_then_resumed(tmp_path: Path, monkeypatch):
+    """#24: the job assignment must happen before the child runs. Assert the
+    spawn carries CREATE_SUSPENDED and that resume is called after Popen."""
+    if not sandbox_module._is_windows():
+        return
+
+    order = []
+    real_popen = sandbox_module.subprocess.Popen
+    seen = {}
+
+    def spy_popen(*args, **kwargs):
+        seen["creationflags"] = kwargs.get("creationflags", 0)
+        order.append("popen")
+        return real_popen(*args, **kwargs)
+
+    real_resume = sandbox_module._resume_process_threads
+
+    def spy_resume(pid):
+        order.append("resume")
+        return real_resume(pid)
+
+    monkeypatch.setattr(sandbox_module.subprocess, "Popen", spy_popen)
+    monkeypatch.setattr(sandbox_module, "_resume_process_threads", spy_resume)
+
+    ok, output = sandboxed_run([sys.executable, "-c", "print('ran')"],
+                               cwd=tmp_path, timeout_s=60)
+
+    assert ok is True and "ran" in output
+    assert seen["creationflags"] & sandbox_module.CREATE_SUSPENDED
+    assert order == ["popen", "resume"]
