@@ -128,3 +128,12 @@ def test_blob_root_is_overrideable(tmp_path: Path):
     event = repo.append_run_event("run-x", "log", "runtime", {"big": "y" * 70_000})
 
     assert list(blob_root.rglob(event.blob_ref)) != []
+
+
+def test_event_timeline_returns_parsed_datetimes(tmp_path):
+    from datetime import datetime
+
+    repo, run_id = make_repo(tmp_path)
+    repo.append_run_event(run_id, "log", "runtime", {"x": 1})
+    timeline = repo.event_timeline(run_id)
+    assert timeline and isinstance(timeline[0]["ts"], datetime)
