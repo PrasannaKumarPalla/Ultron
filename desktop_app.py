@@ -39,18 +39,36 @@ def _warn(text: str, title: str) -> None:
     _msgbox(text, title, 0x30)  # MB_ICONWARNING
 
 
+def _require(report, key: str):
+    return next((r for r in report.requirements if r.key == key), None)
+
+
 def bootstrap_ollama_and_models() -> None:
-    """Interactive first-run bootstrap for Ollama + a default chat model.
+    """Interactive first-run bootstrap, driven by the preflight report.
 
-    Called before the main server starts. All dialogs are optional; the
-    user can decline and the app falls back to the legacy error path.
+    Called before the main server starts. Detects the machine, then walks the
+    prerequisite report: warns (overridably) on low RAM / disk, installs Ollama
+    if missing, and offers to pull the hardware-matched recommended model. All
+    dialogs are optional; declining falls back to the legacy error path.
     """
-    from ultron import bootstrap
+    from ultron import bootstrap, preflight
 
-    if not bootstrap.ollama_available() and not bootstrap.ollama_responds():
+    report = preflight.resolve(preflight.detect_machine())
+
+    for key in ("ram", "disk"):
+        req = _require(report, key)
+        if req and req.blocking and req.status == "insufficient":
+            if not _confirm_yesno(
+                f"{req.label}: {req.detail}\n\n"
+                "Ultron may not run well on this machine. Continue anyway?",
+                "Ultron: system check", icon=0x30,
+            ):
+                raise SystemExit(1)
+
+    if (_require(report, "ollama") or None) and _require(report, "ollama").status != "ok":
         prompt = (
             "Ollama is required to run Ultron and was not found.\n\n"
-            "Download and install it now? (~50 MB, one-click install.)\n\n"
+            "Download and install it now? (Resumable, one-click install.)\n\n"
             "Choose No to open the download page in your browser instead."
         )
         if _confirm_yesno(prompt, "Ultron: install Ollama?", icon=0x30):
@@ -79,20 +97,26 @@ def bootstrap_ollama_and_models() -> None:
 
             webbrowser.open(OLLAMA_DOWNLOAD_URL)
             raise SystemExit(1)
+        report = preflight.resolve(preflight.detect_machine())  # Ollama now present
 
-    models = bootstrap.installed_models()
-    if not models:
+    model_req = _require(report, "model")
+    if model_req and model_req.status == "missing" and report.recommended_model:
+        tag = report.recommended_model
+        size_gb = (model_req.download_mb or 0) / 1024
+        note = "  (CPU — expect slow responses)" if report.degraded else ""
         prompt = (
-            f"Ollama is running but no chat models are installed.\n\n"
-            f"Pull the recommended model `{bootstrap.DEFAULT_MODEL}` now?\n"
-            f"(~15 GB, runs in a separate window; you can keep using Ultron "
-            f"while it downloads.)"
+            f"No local chat model is installed.\n\n"
+            f"Pull {tag}{note} now?  (~{size_gb:.0f} GB)\n"
+            f"Runs in a separate window; you can keep using Ultron while it downloads.\n\n"
+            f"{report.model_reason}"
         )
         if _confirm_yesno(prompt, "Ultron: pull a model?"):
             subprocess.Popen(  # noqa: S603, S607 - user-consented model pull
-                ["cmd", "/c", f"ollama pull {bootstrap.DEFAULT_MODEL} & pause"],
+                ["cmd", "/c", f"ollama pull {tag} & pause"],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,  # type: ignore[attr-defined]
             )
+    elif model_req and model_req.status == "insufficient":
+        _warn(model_req.detail, "Ultron: cannot recommend a model")
 
 
 def app_icon() -> str | None:
