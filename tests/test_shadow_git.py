@@ -166,3 +166,14 @@ async def test_mission_red_rolls_back_workspace_to_baseline(tmp_path: Path):
     assert "shadow.forwarded" not in kinds
     assert not (tmp_path / "workspace" / "test_product.py").exists()
 
+
+
+def test_changed_files_logs_and_returns_empty_on_git_error(tmp_path, caplog):
+    import logging
+    from ultron.shadow_git import ShadowGit
+
+    shadow = ShadowGit(tmp_path)  # never ensure()d -> no candidate branch
+    with caplog.at_level(logging.WARNING, logger="ultron.shadow_git"):
+        assert shadow.changed_files() == []
+        assert shadow.diff_stat() == ""
+    assert any("failed" in r.message for r in caplog.records)

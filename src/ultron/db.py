@@ -676,8 +676,9 @@ class Repository:
             ).fetchall()
         return [
             {"id": row["id"], "kind": row["kind"], "agent": row["agent"],
-             "ts": row["ts"], "hash": row["hash"], "parent_hash": row["parent_hash"],
-             "blob_ref": row["blob_ref"], "stored_bytes": row["stored_bytes"]}
+             "ts": datetime.fromisoformat(row["ts"]), "hash": row["hash"],
+             "parent_hash": row["parent_hash"], "blob_ref": row["blob_ref"],
+             "stored_bytes": row["stored_bytes"]}
             for row in rows
         ]
 
