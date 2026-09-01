@@ -9,8 +9,11 @@ same Protocol later.
 from __future__ import annotations
 
 import itertools
+import re
 import uuid
 from dataclasses import dataclass, field
+
+_PYTEST_TALLY = re.compile(r"(\d+) (passed|failed|error|errors)")
 
 
 @dataclass(frozen=True)
@@ -30,21 +33,59 @@ class SearchConfig:
 
 
 class Verifier:
-    """Scores a candidate branch from observable signals. Higher = better."""
+    """Scores a candidate branch. A real test run, when present, dominates;
+    self-reported signals only break ties. Higher = better."""
 
     def score(self, objective: str, evidence: str, candidate: dict) -> float:
         score = 0.0
-        files = candidate.get("files_written") or []
-        score += min(len(files), 3) * 0.15
-        if candidate.get("verdict") == "PASS":
+        if "tests_passed" in candidate:
+            score += 0.6 if candidate["tests_passed"] else -0.6
+            score += self._tally_bonus(candidate.get("test_output") or "")
+        elif candidate.get("verdict") == "PASS":
             score += 0.5
         elif candidate.get("verdict") == "CHANGES_REQUIRED":
             score -= 0.2
+        files = candidate.get("files_written") or []
+        score += min(len(files), 3) * 0.1
         summary = (candidate.get("summary") or "").strip()
-        score += min(len(summary) / 500.0, 0.15)
+        score += min(len(summary) / 500.0, 0.1)
         feedback = (candidate.get("feedback") or "").strip()
-        score += min(len(feedback) / 2000.0, 0.1)
+        score += min(len(feedback) / 2000.0, 0.05)
         return round(max(-1.0, min(1.0, score)), 4)
+
+    @staticmethod
+    def _tally_bonus(output: str) -> float:
+        passed = failed = 0
+        for count, kind in _PYTEST_TALLY.findall(output):
+            if kind == "passed":
+                passed += int(count)
+            else:
+                failed += int(count)
+        total = passed + failed
+        if not total:
+            return 0.0
+        return round((passed / total - 0.5) * 0.2, 4)
+
+
+class LLMVerifier(Verifier):
+    """Blends the deterministic signal score with an async model judgement.
+
+    `score_fn(objective, evidence, candidate) -> float in [-1, 1]` is any
+    callable that asks a model to rate the candidate; its verdict and the
+    signal score are averaged so a model outage degrades to signals only.
+    """
+
+    def __init__(self, score_fn):
+        self._score_fn = score_fn
+
+    async def ascore(self, objective: str, evidence: str, candidate: dict) -> float:
+        signal = self.score(objective, evidence, candidate)
+        try:
+            judged = float(await self._score_fn(objective, evidence, candidate))
+        except Exception:
+            return signal
+        judged = max(-1.0, min(1.0, judged))
+        return round((signal + judged) / 2.0, 4)
 
 
 @dataclass
@@ -96,6 +137,21 @@ class SpeculativeSearch:
         """Expand + score + prune in one step; returns (winner_payload, all_branches)."""
         branches = self.expand(candidates, parent_id=parent_id, depth=depth,
                                objective=objective, evidence=evidence)
+        winner = self.prune(branches)
+        return (winner.payload if winner else None), branches
+
+    async def aselect(self, candidates: list[dict], parent_id: str | None = None,
+                      depth: int = 0, objective: str = "", evidence: str = "") -> tuple[dict | None, list[Branch]]:
+        """Like select(), but awaits an async verifier (`ascore`) when the
+        verifier exposes one — e.g. an LLM-backed judge."""
+        ascore = getattr(self.verifier, "ascore", None)
+        if ascore is None:
+            return self.select(candidates, parent_id, depth, objective, evidence)
+        limited = candidates[: self.config.beam_width]
+        branches = [Branch(payload=c, parent_id=parent_id, depth=depth) for c in limited]
+        for branch in branches:
+            branch.score = await ascore(objective, evidence, branch.payload)
+            self._branches.append(branch)
         winner = self.prune(branches)
         return (winner.payload if winner else None), branches
 

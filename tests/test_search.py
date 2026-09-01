@@ -189,3 +189,49 @@ async def test_speculative_search_degrades_to_single_path_without_shadow(tmp_pat
     kinds = [event.kind for event in repo.events(mission.id)]
     assert "search.degraded" in kinds
 
+
+
+def test_real_test_results_outweigh_a_self_reported_pass():
+    verifier = Verifier()
+    lying = {"summary": "done", "files_written": ["a.py"], "verdict": "PASS",
+             "tests_passed": False, "test_output": "1 failed, 2 passed"}
+    honest = {"summary": "done", "files_written": ["a.py"], "verdict": "CHANGES_REQUIRED",
+              "tests_passed": True, "test_output": "5 passed"}
+
+    assert verifier.score("obj", "", honest) > verifier.score("obj", "", lying)
+    assert verifier.score("obj", "", lying) < 0
+
+
+@pytest.mark.asyncio
+async def test_llm_verifier_blends_and_degrades_to_signals_on_error():
+    from ultron.search import LLMVerifier
+
+    async def judge(objective, evidence, candidate):
+        return 1.0
+
+    async def broken(objective, evidence, candidate):
+        raise RuntimeError("model down")
+
+    cand = strong_candidate()
+    signal = Verifier().score("obj", "", cand)
+
+    blended = await LLMVerifier(judge).ascore("obj", "", cand)
+    assert signal < blended <= 1.0
+
+    degraded = await LLMVerifier(broken).ascore("obj", "", cand)
+    assert degraded == signal
+
+
+@pytest.mark.asyncio
+async def test_aselect_uses_the_async_verifier():
+    from ultron.search import LLMVerifier
+
+    async def judge(objective, evidence, candidate):
+        return 1.0 if candidate.get("verdict") == "PASS" else -1.0
+
+    search = SpeculativeSearch(SearchConfig(beam_width=2), verifier=LLMVerifier(judge))
+
+    winner, history = await search.aselect([weak_candidate(), strong_candidate()])
+    assert winner["verdict"] == "PASS"
+    assert len(history) == 2
+    assert all(branch.score is not None for branch in history)
