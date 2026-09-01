@@ -154,3 +154,25 @@ def test_event_timeline_returns_parsed_datetimes(tmp_path):
     repo.append_run_event(run_id, "log", "runtime", {"x": 1})
     timeline = repo.event_timeline(run_id)
     assert timeline and isinstance(timeline[0]["ts"], datetime)
+
+
+def test_verify_large_chain_is_correct_and_does_not_fetchall(tmp_path):
+    import inspect
+
+    from ultron.db import Repository
+
+    assert "fetchall" not in inspect.getsource(Repository.verify_event_chain)
+
+    repo, run_id = make_repo(tmp_path)
+    for i in range(500):
+        repo.append_run_event(run_id, "log", "runtime", {"i": i})
+    assert repo.verify_event_chain(run_id) == {
+        "ok": True, "checked": 500, "broken_at": None, "reason": None}
+
+    with repo.connect() as db:
+        target = db.execute(
+            "SELECT id FROM events WHERE run_id=? ORDER BY id LIMIT 1 OFFSET 250", (run_id,)
+        ).fetchone()["id"]
+        db.execute("UPDATE events SET payload_json='{\"tampered\":true}' WHERE id=?", (target,))
+    bad = repo.verify_event_chain(run_id)
+    assert bad["ok"] is False and bad["checked"] == 250

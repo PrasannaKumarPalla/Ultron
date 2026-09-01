@@ -601,27 +601,35 @@ class Repository:
         ]
 
     def verify_event_chain(self, run_id: str) -> dict:
-        """Walk the per-run hash chain; report the first tampered or missing link."""
-        with self.connect() as db:
-            rows = db.execute(
-                "SELECT * FROM events WHERE run_id=? ORDER BY id", (run_id,)
-            ).fetchall()
+        """Walk the per-run hash chain; report the first tampered or missing link.
+
+        Streams rows from the cursor rather than materialising the whole run, so a
+        single history of hundreds of thousands of events verifies at constant
+        memory.
+        """
         parent_hash = ""
-        for index, row in enumerate(rows):
-            if not row["hash"]:
-                return {"ok": False, "checked": index, "broken_at": row["id"],
-                        "reason": "missing hash"}
-            expected = self._event_hash(parent_hash, row["run_id"], row["agent"],
-                                        row["kind"], row["payload_json"],
-                                        datetime.fromisoformat(row["ts"]))
-            if expected != row["hash"]:
-                return {"ok": False, "checked": index, "broken_at": row["id"],
-                        "reason": "hash mismatch"}
-            if row["parent_hash"] != (parent_hash or None):
-                return {"ok": False, "checked": index, "broken_at": row["id"],
-                        "reason": "parent link mismatch"}
-            parent_hash = row["hash"]
-        return {"ok": True, "checked": len(rows), "broken_at": None, "reason": None}
+        index = 0
+        with self.connect() as db:
+            cursor = db.execute(
+                "SELECT id, run_id, agent, kind, payload_json, ts, hash, parent_hash"
+                " FROM events WHERE run_id=? ORDER BY id", (run_id,)
+            )
+            for row in cursor:
+                if not row["hash"]:
+                    return {"ok": False, "checked": index, "broken_at": row["id"],
+                            "reason": "missing hash"}
+                expected = self._event_hash(parent_hash, row["run_id"], row["agent"],
+                                            row["kind"], row["payload_json"],
+                                            datetime.fromisoformat(row["ts"]))
+                if expected != row["hash"]:
+                    return {"ok": False, "checked": index, "broken_at": row["id"],
+                            "reason": "hash mismatch"}
+                if row["parent_hash"] != (parent_hash or None):
+                    return {"ok": False, "checked": index, "broken_at": row["id"],
+                            "reason": "parent link mismatch"}
+                parent_hash = row["hash"]
+                index += 1
+        return {"ok": True, "checked": index, "broken_at": None, "reason": None}
 
     def add_episodic(self, project_id: str, text: str, embedding: list[float]) -> str:
         memory_id = uuid.uuid4().hex
