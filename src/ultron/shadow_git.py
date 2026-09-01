@@ -65,8 +65,8 @@ class ShadowGit:
             exclude = self.git_dir / "info" / "exclude"
             exclude.parent.mkdir(parents=True, exist_ok=True)
             exclude.write_text(
-                "\n".join([f"{SHADOW_DIR}/", ".pytest_cache/", "__pycache__/", "*.pyc",
-                           ".venv/", "node_modules/"]) + "\n",
+                "\n".join([f"{SHADOW_DIR}/", ".worktrees/", ".pytest_cache/",
+                           "__pycache__/", "*.pyc", ".venv/", "node_modules/"]) + "\n",
                 encoding="utf-8")
             self._must("symbolic-ref", "HEAD", f"refs/heads/{MAIN_BRANCH}")
         code, _ = self._git("rev-parse", "--verify", "HEAD")
@@ -156,14 +156,57 @@ class ShadowGit:
         self._must("checkout", "-f", f"{CANDIDATE_BRANCH}-{tag}")
         return main_head
 
-    def commit_variant(self, tag: str, label: str) -> str | None:
-        status = self._git("status", "--porcelain")[1].strip()
-        if not status and self._git("diff", "--quiet", "HEAD")[0] == 0:
-            return self.head()
-        return self.commit_all(label)
-
     def forward_variant(self, tag: str) -> str:
         """Fast-forward main to the winning variant's branch."""
         self._must("checkout", "-f", MAIN_BRANCH)
         self._must("merge", "--ff-only", f"{CANDIDATE_BRANCH}-{tag}")
         return self.head()
+
+    def _git_at(self, wt_path: Path, *args: str) -> tuple[int, str]:
+        """git inside a linked worktree: its `.git` file resolves the repo, so
+        the GIT_DIR / GIT_WORK_TREE overrides must be cleared."""
+        env = dict(os.environ)
+        for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE",
+                    "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"):
+            env.pop(var, None)
+        try:
+            completed = subprocess.run(["git", "-C", str(wt_path), *args],
+                                       capture_output=True, text=True, timeout=120, env=env)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return 1, str(exc)
+        return completed.returncode, completed.stdout + completed.stderr
+
+    def add_variant_worktree(self, tag: str) -> Path:
+        """Check the tag's branch out in its own linked worktree so variants can
+        run in parallel without sharing one checkout."""
+        self.ensure()
+        main_head = self._must("rev-parse", "--verify", MAIN_BRANCH).strip()
+        branch = f"{CANDIDATE_BRANCH}-{tag}"
+        self._must("update-ref", f"refs/heads/{branch}", main_head)
+        wt = self.workspace / ".worktrees" / f"variant-{tag}"
+        if wt.exists():
+            self._git("worktree", "remove", "--force", str(wt))
+        wt.parent.mkdir(parents=True, exist_ok=True)
+        self._must("worktree", "add", "--force", str(wt), branch)
+        return wt
+
+    def commit_variant_worktree(self, wt_path: Path, label: str) -> str | None:
+        code, out = self._git_at(wt_path, "status", "--porcelain")
+        if code == 0 and not out.strip():
+            code, head = self._git_at(wt_path, "rev-parse", "HEAD")
+            return head.strip() if code == 0 else None
+        self._git_at(wt_path, "add", "-A", "--", ".")
+        code, out = self._git_at(wt_path, "-c", "user.name=Ultron", "-c",
+                                 "user.email=ultron@local", "commit", "-m", label)
+        if code != 0:
+            raise ShadowGitError(f"variant commit failed: {out.strip()}")
+        code, head = self._git_at(wt_path, "rev-parse", "HEAD")
+        return head.strip() if code == 0 else None
+
+    def remove_variant_worktrees(self) -> None:
+        root = self.workspace / ".worktrees"
+        if not root.exists():
+            return
+        for wt in sorted(root.glob("variant-*")):
+            self._git("worktree", "remove", "--force", str(wt))
+        self._git("worktree", "prune")

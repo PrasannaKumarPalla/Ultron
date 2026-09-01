@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import TypedDict
 from contextlib import asynccontextmanager
@@ -552,14 +553,13 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
             return await self._role(state, "developer", "developer")
 
         beam = self.search.config.beam_width
-        candidates: list[dict] = []
-        tags: list[str] = []
-        for variant in range(beam):
-            tag = f"v{variant}"
-            shadow.begin_variant(tag)
+        tags = [f"v{variant}" for variant in range(beam)]
+        worktrees = {tag: shadow.add_variant_worktree(tag) for tag in tags}
+
+        async def run_variant(variant: int, tag: str) -> dict:
             try:
                 result = await self.studio.run_role(
-                    mission_id, state["project_id"], Path(state["workspace_path"]),
+                    mission_id, state["project_id"], worktrees[tag],
                     "developer", state["objective"], state.get("feedback", ""),
                     state.get("test_evidence", ""), variant=variant)
                 files, verdict, summary, feedback = (
@@ -568,10 +568,16 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
                 raise
             except Exception as exc:
                 files, verdict, summary, feedback = [], "CHANGES_REQUIRED", f"variant {variant} failed", str(exc)
-            shadow.commit_variant(tag, f"speculative candidate {tag}")
-            tags.append(tag)
-            candidates.append({"summary": summary, "files_written": files,
-                               "verdict": verdict, "feedback": feedback})
+            shadow.commit_variant_worktree(worktrees[tag], f"speculative candidate {tag}")
+            return {"summary": summary, "files_written": files,
+                    "verdict": verdict, "feedback": feedback}
+
+        try:
+            candidates = await asyncio.gather(
+                *(run_variant(i, tag) for i, tag in enumerate(tags)))
+        finally:
+            shadow.remove_variant_worktrees()
+        candidates = list(candidates)
 
         winner_payload, all_branches = self.search.select(
             candidates, depth=state.get("iteration", 0),
