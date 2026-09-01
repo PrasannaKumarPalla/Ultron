@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (without leading v), e.g. 0.1.0"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          $v = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:INPUT_VERSION }
+          if (-not $v) { $v = '0.0.0' }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "Ultron version resolved to $v"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build Ultron.exe
+        run: python -m PyInstaller --clean --noconfirm Ultron.spec
+
+      - name: Verify exe present
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/Ultron.exe)) { throw "dist/Ultron.exe missing" }
+          $len = (Get-Item dist/Ultron.exe).Length
+          "Ultron.exe size: $len bytes"
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) { $nsis = "C:\Program Files\NSIS\makensis.exe" }
+          if (-not (Test-Path $nsis)) { throw "makensis.exe not found" }
+          & $nsis /DVERSION=${{ steps.ver.outputs.version }} installer/ultron.nsi
+          if ($LASTEXITCODE -ne 0) { throw "NSIS build failed" }
+
+      - name: List release artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem dist | Format-Table Name,Length -AutoSize
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ultron-${{ steps.ver.outputs.version }}
+          path: |
+            dist/Ultron.exe
+            dist/Ultron-Setup-*.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            dist/Ultron.exe
+            dist/Ultron-Setup-*.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true

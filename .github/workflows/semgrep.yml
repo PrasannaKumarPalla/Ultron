@@ -1,0 +1,44 @@
+name: Semgrep SAST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history so --baseline-commit can diff
+
+      # SARIF upload to GitHub code scanning is skipped: it requires GitHub
+      # Advanced Security, which isn't enabled on this private repo. `semgrep ci`
+      # gates the build on findings via its exit code.
+      #
+      # Baseline: the absorbed src/bujji framework carries a large pre-existing
+      # backlog of p/default findings (eval/exec/subprocess/raw-SQL — inherent to
+      # a code-execution agent). We scan the whole tree but only *new* findings
+      # (introduced after the baseline commit) block. Bump SEMGREP_BASELINE after
+      # a triage pass that clears real issues.
+      #
+      # On pull_request, `semgrep ci` is diff-aware against the PR base on its
+      # own; the baseline flag matters for the push-to-main scan.
+      - name: Run Semgrep
+        run: >
+          semgrep scan
+          --config p/default
+          --baseline-commit "$SEMGREP_BASELINE"
+          --error
+          --skip-unknown-extensions
+        env:
+          SEMGREP_BASELINE: 861aaba2d998390aefa1f6fa22e4728ccaa64b29

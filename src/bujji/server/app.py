@@ -1,0 +1,508 @@
+"""FastAPI application factory for the assistant API server."""
+
+from __future__ import annotations
+
+import logging
+import pathlib
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from bujji.server.analytics_routes import router as analytics_router
+from bujji.server.api_routes import include_all_routes
+from bujji.server.comparison import comparison_router
+from bujji.server.connectors_router import create_connectors_router
+from bujji.server.dashboard import dashboard_router
+from bujji.server.digest_routes import create_digest_router
+from bujji.server.research_router import router as research_router
+from bujji.server.routes import router
+from bujji.server.upload_router import router as upload_router
+from bujji.server.voice_ws import broadcaster as voice_broadcaster
+from bujji.server.voice_ws import router as voice_ws_router
+from bujji.server.settings_routes import router as settings_router
+from bujji.server.android_routes import router as android_router
+from bujji.brand import get_branding
+
+logger = logging.getLogger(__name__)
+_BRAND = get_branding()
+
+
+@asynccontextmanager
+async def _app_lifespan(app: FastAPI):
+    """Start and stop application services using FastAPI's lifespan API."""
+    import asyncio
+
+    voice_broadcaster.set_loop(asyncio.get_running_loop())
+    pipeline = getattr(app.state, "voice_pipeline", None)
+    starter = getattr(app.state, "start_voice_pipeline", None)
+    if starter is not None:
+        await starter()
+    elif pipeline is not None:
+        try:
+            pipeline.start()
+            logger.info("Voice pipeline started")
+        except Exception as exc:
+            logger.warning("Voice pipeline start failed: %s", exc)
+
+    _restore_sendblue_bindings(app)
+    try:
+        yield
+    finally:
+        bridge = getattr(app.state, "analytics_bridge", None)
+        if bridge is not None:
+            try:
+                bridge.stop()
+            except Exception:
+                pass
+        client = getattr(app.state, "analytics_client", None)
+        if client is not None:
+            try:
+                client.shutdown()
+            except Exception:
+                pass
+        service = getattr(app.state, "memory_service", None)
+        if service is not None:
+            try:
+                service.stop()
+            except Exception:
+                pass
+
+
+def _restore_sendblue_bindings(app: FastAPI) -> None:
+    """Restore SendBlue channel bindings from the database on startup.
+
+    If a SendBlue binding was created via the Messaging tab and the server
+    restarts, this ensures the ChannelBridge + DeepResearchAgent are wired
+    up so incoming webhooks continue to work.
+    """
+    try:
+        mgr = getattr(app.state, "agent_manager", None)
+        if mgr is None:
+            return
+
+        # Check all agents for sendblue bindings
+        for agent in mgr.list_agents():
+            agent_id = agent.get("id", agent.get("agent_id", ""))
+            bindings = mgr.list_channel_bindings(agent_id)
+            for b in bindings:
+                if b.get("channel_type") != "sendblue":
+                    continue
+                config = b.get("config", {})
+                api_key_id = config.get("api_key_id", "")
+                api_secret_key = config.get("api_secret_key", "")
+                from_number = config.get("from_number", "")
+                if not api_key_id or not api_secret_key:
+                    continue
+
+                from bujji.channels.sendblue import SendBlueChannel
+
+                sb = SendBlueChannel(
+                    api_key_id=api_key_id,
+                    api_secret_key=api_secret_key,
+                    from_number=from_number,
+                )
+                sb.connect()
+                app.state.sendblue_channel = sb
+
+                # Create ChannelBridge if none exists
+                bridge = getattr(app.state, "channel_bridge", None)
+                if bridge and hasattr(bridge, "_channels"):
+                    bridge._channels["sendblue"] = sb
+                else:
+                    from bujji.server.channel_bridge import ChannelBridge
+                    from bujji.server.session_store import SessionStore
+
+                    session_store = SessionStore()
+                    engine = getattr(app.state, "engine", None)
+                    dr_agent = None
+                    if engine:
+                        from bujji.server.agent_manager_routes import (
+                            _build_deep_research_tools,
+                        )
+
+                        tools = _build_deep_research_tools(engine=engine, model="")
+                        if tools:
+                            from bujji.agents.deep_research import (
+                                DeepResearchAgent,
+                            )
+
+                            model_name = getattr(app.state, "model", "") or getattr(
+                                engine, "_model", ""
+                            )
+                            dr_agent = DeepResearchAgent(
+                                engine=engine,
+                                model=model_name,
+                                tools=tools,
+                            )
+
+                    bus = getattr(app.state, "bus", None)
+                    if bus is None:
+                        from bujji.core.events import EventBus
+
+                        bus = EventBus()
+
+                    app.state.channel_bridge = ChannelBridge(
+                        channels={"sendblue": sb},
+                        session_store=session_store,
+                        bus=bus,
+                        agent_manager=mgr,
+                        deep_research_agent=dr_agent,
+                    )
+
+                logger.info(
+                    "Restored SendBlue channel binding: %s",
+                    from_number,
+                )
+                return  # Only need one SendBlue binding
+    except Exception as exc:
+        logger.debug("SendBlue binding restore skipped: %s", exc)
+
+
+# No-cache headers applied to static file responses
+_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+class _NoCacheStaticFiles(StaticFiles):
+    """StaticFiles subclass that adds no-cache headers to every response."""
+
+    async def __call__(self, scope, receive, send):
+        async def _send_with_headers(message):
+            if message["type"] == "http.response.start":
+                extra = [(k.encode(), v.encode()) for k, v in _NO_CACHE_HEADERS.items()]
+                # Remove etag and last-modified
+                existing = [
+                    (k, v)
+                    for k, v in message.get("headers", [])
+                    if k.lower() not in (b"etag", b"last-modified")
+                ]
+                message = {**message, "headers": existing + extra}
+            await send(message)
+
+        await super().__call__(scope, receive, _send_with_headers)
+
+
+def create_app(
+    engine,
+    model: str,
+    *,
+    agent=None,
+    bus=None,
+    engine_name: str = "",
+    agent_name: str = "",
+    channel_bridge=None,
+    config=None,
+    memory_backend=None,
+    memory_service=None,
+    speech_backend=None,
+    tts_backend=None,
+    agent_manager=None,
+    agent_scheduler=None,
+    voice_pipeline=None,
+    api_key: str = "",
+    webhook_config: dict | None = None,
+    cors_origins: list[str] | None = None,
+) -> FastAPI:
+    """Create and configure the FastAPI application.
+
+    Parameters
+    ----------
+    engine:
+        The inference engine to use for completions.
+    model:
+        Default model name.
+    agent:
+        Optional agent instance for agent-mode completions.
+    bus:
+        Optional event bus for telemetry.
+    channel_bridge:
+        Optional channel bridge for multi-platform messaging.
+    config:
+        Optional BujjiConfig for other settings.
+    """
+    app = FastAPI(
+        title=f"{_BRAND.product_name} API",
+        description=f"OpenAI-compatible API server for {_BRAND.product_name}",
+        version="0.1.0",
+        lifespan=_app_lifespan,
+    )
+
+    from fastapi.middleware.cors import CORSMiddleware
+
+    _origins = (
+        cors_origins
+        if cors_origins is not None
+        else [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            # Tauri 2 production webview origins:
+            #   macOS / Linux / iOS  -> tauri://localhost
+            #   Windows / Android    -> http://tauri.localhost (default),
+            #                           https://tauri.localhost when
+            #                           windows.useHttpsScheme is enabled
+            "tauri://localhost",
+            "http://tauri.localhost",
+            "https://tauri.localhost",
+        ]
+    )
+    # Never combine a wildcard origin with credentials: that lets any website
+    # make authenticated cross-origin requests to a LAN instance. If "*" is
+    # configured, drop credentials so the wildcard stays anonymous-only.
+    _allow_credentials = "*" not in _origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=_allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Store dependencies in app state
+    app.state.engine = engine
+    app.state.model = model
+    app.state.agent = agent
+    app.state.bus = bus
+    app.state.engine_name = engine_name
+    app.state.agent_name = agent_name or (
+        getattr(agent, "agent_id", None) if agent else None
+    )
+    app.state.channel_bridge = channel_bridge
+    app.state.config = config
+    app.state.memory_backend = memory_backend
+    app.state.memory_service = memory_service
+    app.state.speech_backend = speech_backend
+    app.state.tts_backend = tts_backend
+    app.state.agent = agent
+    app.state.agent_manager = agent_manager
+    app.state.agent_scheduler = agent_scheduler
+    app.state.voice_pipeline = voice_pipeline
+    app.state.session_start = time.time()
+    # Exposed so WebSocket handlers can authenticate the handshake (the HTTP
+    # AuthMiddleware never sees WS upgrade requests). Empty = auth disabled.
+    app.state.api_key = api_key
+    app.state.branding = _BRAND
+
+    # Wire up trace store if traces are enabled.
+    #
+    # We deliberately do NOT subscribe the trace store to the bus. The chat
+    # endpoints persist through a TraceCollector that calls store.save()
+    # directly (mirroring system/orchestrator.py), and the collector ALSO
+    # publishes TRACE_COMPLETE. A store subscribed to that same bus would
+    # therefore save every agent trace twice Ã¢â‚¬â€ the second INSERT hitting the
+    # UNIQUE constraint on trace_id (a 500 on every completion). Keeping the
+    # collector the single writer is what makes the dual code path safe; only
+    # the telemetry store is bus-subscribed (see system/builder.py).
+    app.state.trace_store = None
+    try:
+        from bujji.core.config import load_config
+        from bujji.traces.store import TraceStore
+
+        cfg = config if config is not None else load_config()
+        if cfg.traces.enabled:
+            app.state.trace_store = TraceStore(db_path=cfg.traces.db_path)
+    except Exception:
+        pass  # traces are optional; don't block server startup
+
+    # Wire up external analytics if enabled (PostHog) Ã¢â‚¬â€ never block startup.
+    # Note: we do NOT fire app_opened here. The frontend owns that event
+    # because "server started" (this code path) is not the same as "user
+    # opened the app" Ã¢â‚¬â€ the server can run headless via cron, daemons,
+    # or test suites.
+    app.state.analytics_client = None
+    app.state.analytics_bridge = None
+    try:
+        from bujji.analytics import (
+            AnalyticsClient,
+            EventBridge,
+            is_analytics_enabled,
+        )
+        from bujji.core.config import load_config
+
+        _cfg = config if config is not None else load_config()
+        if is_analytics_enabled(_cfg.analytics):
+            _client = AnalyticsClient(_cfg.analytics)
+            app.state.analytics_client = _client
+            _bus_ref = getattr(app.state, "bus", None)
+            if _bus_ref is not None:
+                _bridge = EventBridge(_bus_ref, _client)
+                _bridge.start()
+                app.state.analytics_bridge = _bridge
+
+            async def _shutdown_analytics() -> None:
+                bridge = getattr(app.state, "analytics_bridge", None)
+                if bridge is not None:
+                    try:
+                        bridge.stop()
+                    except Exception:
+                        pass
+                client = getattr(app.state, "analytics_client", None)
+                if client is not None:
+                    try:
+                        client.shutdown()
+                    except Exception:
+                        pass
+    except Exception as _exc:
+        logger.debug("Analytics init skipped: %s", _exc)
+
+    # Stop the background memory service cleanly when the server shuts down.
+    if memory_service is not None:
+
+        async def _shutdown_memory_service() -> None:
+            svc = getattr(app.state, "memory_service", None)
+            if svc is not None:
+                try:
+                    svc.stop()
+                except Exception:
+                    pass
+
+    app.include_router(router)
+    app.include_router(voice_ws_router)
+    app.include_router(settings_router)
+    app.include_router(dashboard_router)
+    app.include_router(comparison_router)
+    app.include_router(create_connectors_router())
+    app.include_router(create_digest_router())
+    app.include_router(upload_router)
+    app.include_router(research_router)
+    app.include_router(analytics_router)
+    app.include_router(android_router)
+    include_all_routes(app)
+
+    # Wire voice pipeline to WebSocket broadcaster on startup
+    async def _start_voice_pipeline() -> None:
+        import asyncio
+
+        voice_broadcaster.set_loop(asyncio.get_event_loop())
+        pipeline = getattr(app.state, "voice_pipeline", None)
+        if pipeline is not None:
+            try:
+                pipeline.start()
+                logger.info("Voice pipeline started")
+            except Exception as exc:
+                logger.warning("Voice pipeline start failed: %s", exc)
+
+            # Spoken startup briefing (greeting, weather, status) — runs in a
+            # thread so weather lookups never delay server startup.
+            cfg = getattr(app.state, "config", None)
+            agent_cfg = getattr(cfg, "agent", None) if cfg else None
+            if getattr(agent_cfg, "startup_briefing", True):
+                import threading
+
+                def _speak_briefing() -> None:
+                    try:
+                        import time as _time
+
+                        from bujji.speech.briefing import build_briefing
+
+                        # Wait for the UI to connect (the desktop window takes
+                        # ~30-60s to appear) so the greeting isn't spoken to an
+                        # empty room. Headless: speak after the wait regardless.
+                        for _ in range(90):
+                            if voice_broadcaster._clients:
+                                _time.sleep(2)  # let the window settle
+                                break
+                            _time.sleep(1)
+
+                        name = getattr(agent_cfg, "user_name", "") or "Prasanna"
+                        loc = getattr(agent_cfg, "location", "") or ""
+                        logger.warning("Startup briefing thread running")
+                        text = build_briefing(name, location=loc)
+                        logger.warning("Speaking startup briefing: %s", text[:120])
+                        # Pause the wake mic while she speaks — she hears the
+                        # speakers otherwise (self-triggers, inflated noise floor)
+                        try:
+                            pipeline._wake.stop(wait=True)
+                        except Exception:
+                            pass
+                        pipeline._play_tts(text)
+                        logger.warning("Startup briefing playback finished")
+                        # She just asked "how are you doing today?" — open the
+                        # mic for the answer without requiring the wake word.
+                        # conversation_mode keeps the dialogue going after that.
+                        logger.warning("Opening conversation for the user's reply")
+                        pipeline._on_wake(suppress_ack=True)
+                    except Exception:
+                        logger.warning("Startup briefing FAILED", exc_info=True)
+
+                threading.Thread(
+                    target=_speak_briefing, daemon=True, name="bujji-briefing"
+                ).start()
+
+    app.state.start_voice_pipeline = _start_voice_pipeline
+
+    # Restore SendBlue channel bindings from database on startup
+
+    # Add security headers middleware
+    try:
+        from bujji.server.middleware import create_security_middleware
+
+        middleware_cls = create_security_middleware()
+        if middleware_cls is not None:
+            app.add_middleware(middleware_cls)
+    except Exception as exc:
+        logger.debug("Security middleware init skipped: %s", exc)
+
+    # API key authentication middleware
+    if api_key:
+        try:
+            from bujji.server.auth_middleware import AuthMiddleware
+
+            app.add_middleware(AuthMiddleware, api_key=api_key)
+        except Exception as exc:
+            logger.debug("Auth middleware init skipped: %s", exc)
+
+    # Mount webhook routes (always Ã¢â‚¬â€ SendBlue may be configured dynamically)
+    if webhook_config:
+        try:
+            from bujji.server.webhook_routes import (
+                create_webhook_router,
+            )
+
+            webhook_router = create_webhook_router(
+                bridge=channel_bridge,
+                twilio_auth_token=webhook_config.get("twilio_auth_token", ""),
+                bluebubbles_password=webhook_config.get("bluebubbles_password", ""),
+                whatsapp_verify_token=webhook_config.get("whatsapp_verify_token", ""),
+                whatsapp_app_secret=webhook_config.get("whatsapp_app_secret", ""),
+            )
+            app.include_router(webhook_router)
+        except Exception as exc:
+            logger.debug("Webhook routes init skipped: %s", exc)
+
+    # Serve static frontend assets if the static/ directory exists
+    static_dir = pathlib.Path(__file__).parent / "static"
+    if static_dir.is_dir():
+        assets_dir = static_dir / "assets"
+        if assets_dir.is_dir():
+            app.mount(
+                "/assets",
+                _NoCacheStaticFiles(directory=assets_dir),
+                name="static-assets",
+            )
+
+        @app.get("/{full_path:path}")
+        async def spa_catch_all(full_path: str):
+            """Serve static files directly, fall back to index.html for SPA routes."""
+            if full_path:
+                candidate = (static_dir / full_path).resolve()
+                # Path traversal prevention
+                resolved_root = static_dir.resolve()
+                if candidate.is_relative_to(resolved_root) and candidate.is_file():
+                    return FileResponse(candidate, headers=_NO_CACHE_HEADERS)
+            return FileResponse(
+                static_dir / "index.html",
+                headers=_NO_CACHE_HEADERS,
+            )
+
+    return app
+
+
+__all__ = ["create_app"]

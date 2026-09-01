@@ -1,0 +1,17 @@
+{
+  "name": "bujji-whatsapp-baileys-bridge",
+  "version": "0.1.0",
+  "description": "Node.js bridge between Bujji and WhatsApp via Baileys",
+  "main": "dist/bridge.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/bridge.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "qrcode-terminal": "^0.12"
+  },
+  "devDependencies": {
+    "typescript": "^7.0"
+  }
+}

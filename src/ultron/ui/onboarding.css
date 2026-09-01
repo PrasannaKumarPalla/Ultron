@@ -1,0 +1,8 @@
+.hero .large+.large{margin-left:8px}
+.folder-picker{display:grid;grid-template-columns:1fr auto;gap:8px}
+.folder-picker input{min-width:0}
+.project-choice{display:grid;gap:8px;margin:14px 0}
+.project-choice label{border:1px solid var(--line);border-radius:9px;padding:12px;display:flex;gap:10px;align-items:center;cursor:pointer}
+.project-choice label:has(input:checked){border-color:var(--red);background:var(--panel2)}
+.project-choice input{width:auto}
+@media(max-width:780px){.hero .large+.large{margin:8px 0 0}.folder-picker{grid-template-columns:1fr}}
