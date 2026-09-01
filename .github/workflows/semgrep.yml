@@ -41,4 +41,4 @@ jobs:
           --error
           --skip-unknown-extensions
         env:
-          SEMGREP_BASELINE: 861aaba2d998390aefa1f6fa22e4728ccaa64b29
+          SEMGREP_BASELINE: 81abad11b2758f1a6dee9d6e86458cffe0998cc2

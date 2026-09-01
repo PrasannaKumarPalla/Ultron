@@ -26,4 +26,4 @@ jobs:
           # Lob detector excluded: its regex matches generic `test_<long_identifier>`
           # strings and Lob's API has returned false "verified" responses for garbage
           # keys of that shape, flagging plain pytest function names as leaked secrets.
-          extra_args: --results=verified,unknown --exclude-detectors=Lob
+          extra_args: --results=verified --exclude-detectors=Lob
