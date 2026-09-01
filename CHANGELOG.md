@@ -3,6 +3,28 @@
 All notable changes are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Fixed
+- Phase-1/2 critic tech-debt (#13–#24), one PR each:
+  - Cancelled/crashed missions no longer strand the workspace on a candidate
+    branch — the shadow gate rolls back on cancel and self-heals on the next run.
+  - `mission_events` mirror spills payloads >64 KiB to the blob store instead of
+    double-storing them.
+  - `verify_event_chain` streams the row cursor — constant memory over huge runs.
+  - Blob store gained mark-and-sweep GC, run nightly.
+  - Fork failures write `run.fork_spawned` / `run.fork_failed` back-references on
+    the source run.
+  - `shadow_git` diff helpers log git errors instead of silently returning empty.
+  - `shadow.candidate_opened` no longer emitted for read-only missions;
+    `event_timeline` returns parsed datetimes.
+  - Sandbox spawns the child `CREATE_SUSPENDED`, assigns the Job Object, then
+    resumes — closes the first-ms escape window.
+
+### Added
+- Speculative variants run in parallel over isolated git worktrees and are
+  scored on a real test run per variant; optional async LLM judge (`LLMVerifier`).
+
 ## [0.1.1] - 2026-09-01
 
 ### Added

@@ -1,5 +1,9 @@
 # Phase 1 Critic Pass — 2026-08-25
 
+> **Status: fully resolved (2026-09-01).** Every filed item below (#13–#20) is
+> fixed and merged to `main`; the issues are closed. Kept as the historical
+> record of the pass.
+
 Adversarial self-review over the phase 1 diff (`store`, event chain, blob
 spill, timeline/verify/fork, shadow-git gate, bench). 20 flaws ranked by
 impact. Top 10 fixed before tagging; the rest filed below.
