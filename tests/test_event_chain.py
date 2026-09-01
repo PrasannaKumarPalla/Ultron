@@ -147,3 +147,12 @@ def test_verify_large_chain_is_correct_and_does_not_fetchall(tmp_path):
                    ('{"tampered": true}', run_id, run_id))
     bad = repo.verify_event_chain(run_id)
     assert bad["ok"] is False and bad["checked"] == 250
+
+
+def test_event_timeline_returns_parsed_datetimes(tmp_path):
+    from datetime import datetime
+
+    repo, run_id = make_repo(tmp_path)
+    repo.append_run_event(run_id, "log", "runtime", {"x": 1})
+    timeline = repo.event_timeline(run_id)
+    assert timeline and isinstance(timeline[0]["ts"], datetime)

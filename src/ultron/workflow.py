@@ -274,9 +274,15 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
         if shadow is None or not shadow.available:
             return
         try:
+            baseline = shadow._must("rev-parse", "--verify", "main").strip()
             sha = shadow.candidate_commit(f"candidate after iteration {state.get('iteration', 0)}")
+            changed = shadow.changed_files()
+            if not changed and sha == baseline:
+                self._emit(mission_id, "shadow.candidate_empty", "shadow-git",
+                           {"commit": sha, "reason": "no workspace changes this iteration"})
+                return
             self._emit(mission_id, "shadow.candidate_committed", "shadow-git",
-                       {"commit": sha, "changed_files": shadow.changed_files()})
+                       {"commit": sha, "changed_files": changed})
             if passed:
                 forwarded = shadow.fast_forward()
                 self._emit(mission_id, "shadow.forwarded", "shadow-git", {"commit": forwarded})
