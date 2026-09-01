@@ -7,7 +7,7 @@
 !endif
 
 !define APP_NAME       "Ultron"
-!define APP_PUBLISHER  "Prasanna Palla"
+!define APP_PUBLISHER  "Prasanna Kumar Palla"
 !define APP_URL        "https://github.com/PrasannaKumarPalla/Ultron"
 !define APP_EXE        "Ultron.exe"
 !define UNINST_KEY     "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"

@@ -41,6 +41,11 @@ class AnalyticsClient:
         self._lock = threading.Lock()
         self._posthog: Any = None
         self._enabled = is_analytics_enabled(config)
+        if self._enabled and not (config.host and config.key):
+            logger.info(
+                "Analytics enabled but no PostHog host/key configured; staying disabled"
+            )
+            self._enabled = False
         if self._enabled:
             self._init_sdk()
 
