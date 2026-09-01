@@ -21,9 +21,9 @@ jobs:
         with:
           fetch-depth: 0 # full history so --baseline-commit can diff
 
-      # SARIF upload to GitHub code scanning is skipped: it requires GitHub
-      # Advanced Security, which isn't enabled on this private repo. `semgrep ci`
-      # gates the build on findings via its exit code.
+      # SARIF upload to GitHub code scanning is not wired yet. `semgrep scan`
+      # gates the build on findings via its exit code (--error). Code scanning
+      # ingest is available now the repo is public - add if triage volume grows.
       #
       # Baseline: the absorbed src/bujji framework carries a large pre-existing
       # backlog of p/default findings (eval/exec/subprocess/raw-SQL — inherent to
