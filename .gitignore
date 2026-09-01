@@ -13,7 +13,8 @@ assets/*-source.png
 *.db-wal
 .env
 artifacts/
-data/
+# runtime SQLite + logs, repo root only (not src/**/data which is bujji source)
+/data/
 .worktrees/
 demo/artifacts/
 *.log
