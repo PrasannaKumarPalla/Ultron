@@ -953,7 +953,8 @@ class Repository:
                 "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
             for layer in ("episodic_memories", "semantic_lessons"):
                 if layer in existing:
-                    db.execute(f"DELETE FROM {layer} WHERE project_id=?", (project_id,))
+                    # `layer` is one of the two literals above; project_id is bound.
+                    db.execute(f"DELETE FROM {layer} WHERE project_id=?", (project_id,))  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query,python.lang.security.audit.formatted-sql-query.formatted-sql-query
             db.execute("DELETE FROM missions WHERE project_id=?", (project_id,))
             db.execute("DELETE FROM projects WHERE id=?", (project_id,))
         return {"project": project, "missions_deleted": len(mission_ids)}
