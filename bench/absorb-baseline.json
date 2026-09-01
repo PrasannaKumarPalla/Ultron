@@ -1,0 +1,19 @@
+{
+  "recorded_at": "2026-08-25T12:30:15.391900+00:00",
+  "machine": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.0"
+  },
+  "method": {
+    "cold_start_ms": "median of 3 fresh `import ultron.api` processes",
+    "first_token_ms": "TTFB of POST /api/chat stream against local Ollama",
+    "voice_query": "hey assistant, what needs my attention today?",
+    "mission_start": "You are Ultron's supervisor. Plan a mission titled 'Smoke check'. Reply with the first planning line only."
+  },
+  "ollama_available": true,
+  "model": "qwen3.6:27b",
+  "vram_idle": null,
+  "cold_start_ms": 777.5,
+  "first_token_voice_query_ms": 16614.9,
+  "first_token_mission_start_ms": 1057.4
+}
