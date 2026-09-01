@@ -13,7 +13,7 @@ from .db import Repository
 from .models import EventKind, Mission, MissionStatus, Project
 from .providers import ExecutionProvider, ExecutionRequest
 from .agent_runtime import OllamaAgentStudio, RoleResult, WorkspaceGuard
-from .search import SearchConfig, SpeculativeSearch
+from .search import SearchConfig, SpeculativeSearch, Verifier
 from .security_scan import scan_dependencies, scan_secrets
 from .shadow_git import CANDIDATE_BRANCH, ShadowGit, ShadowGitError
 from .team_planner import TeamPlanner
@@ -262,6 +262,7 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
                  max_repair_loops: int = 2, event_bus: EventBus | None = None,
                  run_manager: RunManager | None = None, enable_critic: bool = False,
                  search: SearchConfig | None = None,
+                 verifier: "Verifier | None" = None,
                  enable_debate: bool = False):
         super().__init__(repository, executor=None, checkpoint_path=checkpoint_path,
                          event_bus=event_bus, run_manager=run_manager)  # type: ignore[arg-type]
@@ -269,7 +270,7 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
         self.max_repair_loops = max_repair_loops
         self.enable_critic = enable_critic
         self.enable_debate = enable_debate
-        self.search = SpeculativeSearch(search or SearchConfig())
+        self.search = SpeculativeSearch(search or SearchConfig(), verifier=verifier)
         self._shadow_cache: dict[str, ShadowGit] = {}
         self._shadow_disabled = False
 
@@ -569,8 +570,10 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
             except Exception as exc:
                 files, verdict, summary, feedback = [], "CHANGES_REQUIRED", f"variant {variant} failed", str(exc)
             shadow.commit_variant_worktree(worktrees[tag], f"speculative candidate {tag}")
+            tests_passed, test_output = await WorkspaceGuard(worktrees[tag]).test()
             return {"summary": summary, "files_written": files,
-                    "verdict": verdict, "feedback": feedback}
+                    "verdict": verdict, "feedback": feedback,
+                    "tests_passed": tests_passed, "test_output": test_output[-4000:]}
 
         try:
             candidates = await asyncio.gather(
@@ -579,7 +582,7 @@ class AutonomousMissionWorkflow(DurableMissionWorkflow):
             shadow.remove_variant_worktrees()
         candidates = list(candidates)
 
-        winner_payload, all_branches = self.search.select(
+        winner_payload, all_branches = await self.search.aselect(
             candidates, depth=state.get("iteration", 0),
             objective=state["objective"], evidence=state.get("test_evidence", ""))
         winner_index = candidates.index(winner_payload) if winner_payload in candidates else 0
