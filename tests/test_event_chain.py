@@ -130,8 +130,35 @@ def test_blob_root_is_overrideable(tmp_path: Path):
     assert list(blob_root.rglob(event.blob_ref)) != []
 
 
+def test_mission_events_mirror_spills_large_payloads(tmp_path):
+    repo, run_id = make_repo(tmp_path)
+    big = {"blob_of_text": "z" * (80 * 1024)}
+    repo.add_event(run_id, "agent.completed", "developer", big)
+    with repo.connect() as db:
+        stored = db.execute(
+            "SELECT payload FROM mission_events WHERE mission_id=? ORDER BY id DESC LIMIT 1",
+            (run_id,),
+        ).fetchone()["payload"]
+    # stored as a compact blob marker, not the full 80 KiB
+    assert len(stored) < 2000
+    assert '"blob"' in stored
+    # events() transparently rehydrates it
+    got = repo.events(run_id)[-1].payload
+    assert got == big
+
+
+def test_event_timeline_returns_parsed_datetimes(tmp_path):
+    from datetime import datetime
+
+    repo, run_id = make_repo(tmp_path)
+    repo.append_run_event(run_id, "log", "runtime", {"x": 1})
+    timeline = repo.event_timeline(run_id)
+    assert timeline and isinstance(timeline[0]["ts"], datetime)
+
+
 def test_verify_large_chain_is_correct_and_does_not_fetchall(tmp_path):
     import inspect
+
     from ultron.db import Repository
 
     assert "fetchall" not in inspect.getsource(Repository.verify_event_chain)
@@ -143,16 +170,9 @@ def test_verify_large_chain_is_correct_and_does_not_fetchall(tmp_path):
         "ok": True, "checked": 500, "broken_at": None, "reason": None}
 
     with repo.connect() as db:
-        db.execute("UPDATE events SET payload_json=? WHERE run_id=? AND id=(SELECT MIN(id)+250 FROM events WHERE run_id=?)",
-                   ('{"tampered": true}', run_id, run_id))
+        target = db.execute(
+            "SELECT id FROM events WHERE run_id=? ORDER BY id LIMIT 1 OFFSET 250", (run_id,)
+        ).fetchone()["id"]
+        db.execute("UPDATE events SET payload_json='{\"tampered\":true}' WHERE id=?", (target,))
     bad = repo.verify_event_chain(run_id)
     assert bad["ok"] is False and bad["checked"] == 250
-
-
-def test_event_timeline_returns_parsed_datetimes(tmp_path):
-    from datetime import datetime
-
-    repo, run_id = make_repo(tmp_path)
-    repo.append_run_event(run_id, "log", "runtime", {"x": 1})
-    timeline = repo.event_timeline(run_id)
-    assert timeline and isinstance(timeline[0]["ts"], datetime)
