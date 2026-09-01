@@ -128,3 +128,22 @@ def test_blob_root_is_overrideable(tmp_path: Path):
     event = repo.append_run_event("run-x", "log", "runtime", {"big": "y" * 70_000})
 
     assert list(blob_root.rglob(event.blob_ref)) != []
+
+
+def test_verify_large_chain_is_correct_and_does_not_fetchall(tmp_path):
+    import inspect
+    from ultron.db import Repository
+
+    assert "fetchall" not in inspect.getsource(Repository.verify_event_chain)
+
+    repo, run_id = make_repo(tmp_path)
+    for i in range(500):
+        repo.append_run_event(run_id, "log", "runtime", {"i": i})
+    assert repo.verify_event_chain(run_id) == {
+        "ok": True, "checked": 500, "broken_at": None, "reason": None}
+
+    with repo.connect() as db:
+        db.execute("UPDATE events SET payload_json=? WHERE run_id=? AND id=(SELECT MIN(id)+250 FROM events WHERE run_id=?)",
+                   ('{"tampered": true}', run_id, run_id))
+    bad = repo.verify_event_chain(run_id)
+    assert bad["ok"] is False and bad["checked"] == 250
