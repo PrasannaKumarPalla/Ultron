@@ -47,6 +47,37 @@ class BlobStore:
     def has(self, digest: str) -> bool:
         return _DIGEST_RE.match(digest or "") is not None and self._path(digest).exists()
 
+    def iter_digests(self):
+        """Yield every stored blob digest."""
+        if not self.root.exists():
+            return
+        for shard in self.root.iterdir():
+            if not shard.is_dir():
+                continue
+            for blob in shard.iterdir():
+                if _DIGEST_RE.match(blob.name):
+                    yield blob.name
+
+    def gc(self, referenced: set[str]) -> dict:
+        """Mark-and-sweep: delete every blob whose digest is not in `referenced`.
+
+        Content-addressed and append-only, so a blob that nothing points at can
+        never be reached again. Returns {"deleted", "kept", "freed_bytes"}.
+        """
+        deleted = kept = freed = 0
+        for digest in list(self.iter_digests()):
+            if digest in referenced:
+                kept += 1
+                continue
+            path = self._path(digest)
+            try:
+                freed += path.stat().st_size
+                path.unlink()
+                deleted += 1
+            except OSError:
+                pass
+        return {"deleted": deleted, "kept": kept, "freed_bytes": freed}
+
     def resolve(self, payload: dict) -> dict:
         """Return the payload with any {"blob": <sha>} reference inlined."""
         ref = payload.get("blob")

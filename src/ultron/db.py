@@ -698,6 +698,26 @@ class Repository:
             for row in rows
         ]
 
+    def _referenced_blob_digests(self) -> set:
+        """Every blob sha currently pointed at from the event store or its mirror."""
+        refs: set = set()
+        with self.connect() as db:
+            for row in db.execute("SELECT blob_ref FROM events WHERE blob_ref IS NOT NULL"):
+                refs.add(row["blob_ref"])
+            for row in db.execute("SELECT payload FROM mission_events WHERE payload LIKE '%\"blob\"%'"):
+                try:
+                    marker = json.loads(row["payload"])
+                except ValueError:
+                    continue
+                if isinstance(marker, dict) and isinstance(marker.get("blob"), str):
+                    refs.add(marker["blob"])
+        return refs
+
+    def gc_blobs(self) -> dict:
+        """Sweep unreferenced blobs. Safe to run any time — a blob with no marker
+        pointing at it is unreachable (content-addressed, append-only store)."""
+        return self.blobs.gc(self._referenced_blob_digests())
+
     def event_count(self, run_id: str) -> int:
         with self.connect() as db:
             row = db.execute("SELECT COUNT(*) FROM events WHERE run_id=?", (run_id,)).fetchone()
