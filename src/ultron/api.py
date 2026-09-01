@@ -924,6 +924,9 @@ async def fork_run(run_id: str, request: ForkRunCreate, settings: Settings = Dep
         "replayed_state_keys": sorted(replayed),
         "applied_edits": sorted(request.edits or {}),
     })
+    repo.add_event(run_id, "run.fork_spawned", "operator", {
+        "fork_run": fork_mission.id, "source_event_id": request.event_id,
+    })
 
     state = dict(replayed)
     state.update(request.edits or {})
