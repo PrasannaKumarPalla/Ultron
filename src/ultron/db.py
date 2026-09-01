@@ -275,7 +275,8 @@ class Repository:
             event_columns = {row[1] for row in db.execute("PRAGMA table_info(events)").fetchall()}
             for column in ("hash", "parent_hash", "blob_ref"):
                 if column not in event_columns:
-                    db.execute(f"ALTER TABLE events ADD COLUMN {column} TEXT")
+                    # `column` is one of the three literals above, not input.
+                    db.execute(f"ALTER TABLE events ADD COLUMN {column} TEXT")  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query,python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
 
     @staticmethod
     def _migrate_general_chat_sessions(db: sqlite3.Connection) -> None:

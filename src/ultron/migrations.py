@@ -41,7 +41,9 @@ def fold_bujji_database(db_path: Path, bujji_db_path: Path) -> dict[str, str]:
         for table in incoming:
             destination = table if table not in existing else f"bujji_{table}"
             columns = [
-                row[1] for row in connection.execute(
+                # PRAGMA args cannot be bound; `table` comes from sqlite_master
+                # and is passed through `_quote()`.
+                row[1] for row in connection.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query,python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
                     f"PRAGMA bujji_src.table_info({_quote(table)})"
                 )
             ]
