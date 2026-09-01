@@ -81,7 +81,8 @@ def sandboxed_run(command: list[str], cwd: Path, timeout_s: int = 180,
                 job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
             pass  # degraded: job still enforces kill-on-close
 
-        completed = subprocess.Popen(command, cwd=str(cwd), stdout=subprocess.PIPE,
+        # requires-python is >=3.12; the py36/py37 Popen-arg compat rules do not apply.
+        completed = subprocess.Popen(command, cwd=str(cwd), stdout=subprocess.PIPE,  # nosemgrep: python.lang.compatibility.python36.python36-compatibility-Popen1,python.lang.compatibility.python36.python36-compatibility-Popen2,python.lang.compatibility.python37.python37-compatibility-Popen1,python.lang.compatibility.python37.python37-compatibility-Popen2
                                      stderr=subprocess.STDOUT, text=True,
                                      encoding="utf-8", errors="replace")
         process = kernel32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, completed.pid)
