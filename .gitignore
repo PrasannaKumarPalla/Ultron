@@ -20,3 +20,8 @@ demo/artifacts/
 secrets/
 omniroute.key
 api_key.txt
+
+# Agent context lives outside the public repo (workspace brain)
+CLAUDE.md
+MEMORY.md
+.claude/
