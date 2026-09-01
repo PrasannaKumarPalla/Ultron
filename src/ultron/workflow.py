@@ -107,6 +107,22 @@ class DurableMissionWorkflow:
                 except ShadowGitError as exc:
                     self._emit(run_id, "shadow.unavailable", "shadow-git", {"reason": str(exc)})
 
+    def _note_fork_outcome(self, run_id: str, outcome: str, error: str | None) -> None:
+        """When a forked run ends badly, write a back-reference on its source run
+        so the source timeline shows that a fork off it failed."""
+        source_run = source_event_id = None
+        for event in self.repository.events(run_id):
+            if event.kind == "run.forked":
+                source_run = event.payload.get("source_run")
+                source_event_id = event.payload.get("source_event_id")
+                break
+        if not source_run:
+            return
+        self._emit(source_run, "run.fork_failed", "supervisor", {
+            "fork_run": run_id, "outcome": outcome,
+            "source_event_id": source_event_id, "error": error,
+        })
+
     async def _execute(self, mission: Mission, initial: dict | None, *, resume: bool) -> Mission:
         config = {"configurable": {"thread_id": mission.id}, "recursion_limit": 30}
         self._emit(mission.id, EventKind.RUN_STARTED, "supervisor",
@@ -125,9 +141,11 @@ class DurableMissionWorkflow:
         except RunCancelled:
             self._rollback_open_candidates(mission.id)
             self._emit(mission.id, EventKind.RUN_CANCELLED, "supervisor", {})
+            self._note_fork_outcome(mission.id, "cancelled", None)
             raise
         except Exception as exc:
             self._emit(mission.id, EventKind.RUN_FAILED, "supervisor", {"error": str(exc)})
+            self._note_fork_outcome(mission.id, "failed", str(exc))
             raise
         result = self.repository.get_mission(mission.id)
         if not result:
