@@ -1222,14 +1222,19 @@ class AnalyticsConfig:
     measure setup success, retention, feature usage, and churn.
 
     No chat content, prompts, model outputs, file paths, emails, IPs,
-    or hardware identifiers are ever sent. See ``docs/telemetry.md``.
+    or hardware identifiers are ever sent.
+
+    ``host`` and ``key`` are intentionally empty: a fork that wants usage
+    analytics points them at its own PostHog project (env
+    ``BUJJI_ANALYTICS__HOST`` / ``BUJJI_ANALYTICS__KEY`` or config file).
+    With either unset the client stays disabled even if ``enabled`` is true.
     """
 
     # External analytics is strictly opt-in. A local-first personal assistant
     # must not contact a telemetry service before the user has consented.
     enabled: bool = False
-    host: str = "https://34.231.106.201.sslip.io"
-    key: str = "phc_ysKu72QaxzYNmDpHFcesD2ZZAe68zkdWJEKoYYkc5e3n"
+    host: str = ""
+    key: str = ""
     anon_id_path: str = field(default_factory=lambda: str(get_config_dir() / "anon_id"))
     flush_interval_seconds: int = 30
     flush_at_size: int = 100
