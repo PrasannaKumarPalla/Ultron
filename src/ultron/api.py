@@ -489,6 +489,7 @@ def delete_project(project_id: str, request: WorkspaceDelete,
     # DB first: if this fails the workspace folder is still intact and the user
     # can retry. (It used to trash the folder first, then 500 on a FK error.)
     result = repo.delete_project(project_id)
+    _repo_intel_cache.pop(str(workspace), None)  # stop the closed workspace leaking
     files_recycled = False
     file_error = None
     if request.delete_files and workspace.exists():

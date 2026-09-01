@@ -21,6 +21,7 @@ class RepoIntel:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
         self._cache: dict[str, tuple[float, int, dict | None]] = {}
+        self._churn_cache: tuple[str, dict[str, int]] | None = None
 
     def python_files(self) -> list[Path]:
         if not self.root.exists():
@@ -128,8 +129,21 @@ class RepoIntel:
             "calls": [call for item in files for call in item["calls"]],
         }
 
+    def _head(self) -> str | None:
+        done = subprocess.run(
+            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10)
+        return done.stdout.strip() if done.returncode == 0 else None
+
     def churn(self, max_commits: int = 200) -> dict[str, int]:
-        """Commit counts per file from local git log ({} when not a repo)."""
+        """Commit counts per file from local git log ({} when not a repo).
+
+        Memoised on the current HEAD: /intel is hit repeatedly and the git log
+        does not change between commits.
+        """
+        head = self._head()
+        if head is not None and self._churn_cache and self._churn_cache[0] == head:
+            return self._churn_cache[1]
         completed = subprocess.run(
             ["git", "-C", str(self.root), "log", "--name-only", "--format=",
              f"-{max_commits}"],
@@ -141,6 +155,8 @@ class RepoIntel:
             path = line.strip()
             if path:
                 counts[path] = counts.get(path, 0) + 1
+        if head is not None:
+            self._churn_cache = (head, counts)
         return counts
 
     def hotspots(self, limit: int = 10) -> list[dict]:

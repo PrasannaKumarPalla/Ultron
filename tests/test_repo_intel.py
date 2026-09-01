@@ -135,3 +135,30 @@ def test_project_intel_endpoint_serves_graph(tmp_path: Path):
             assert client.get("/projects/zzz/intel").status_code == 404
     finally:
         app.dependency_overrides.pop(get_settings, None)
+
+
+def test_churn_is_memoised_on_head(tmp_path, monkeypatch):
+    import subprocess as _sp
+    from ultron.repo_intel import RepoIntel
+
+    calls = {"log": 0}
+
+    class _R:
+        def __init__(self, out):
+            self.returncode = 0
+            self.stdout = out
+
+    def fake_run(cmd, *a, **k):
+        if cmd[-1:] == ["HEAD"]:
+            return _R("abc123\n")
+        if "log" in cmd:
+            calls["log"] += 1
+            return _R("src/a.py\nsrc/a.py\nsrc/b.py\n")
+        raise AssertionError("unexpected git call: " + " ".join(cmd))
+
+    monkeypatch.setattr(_sp, "run", fake_run)
+    intel = RepoIntel(tmp_path)
+    first = intel.churn()
+    second = intel.churn()
+    assert first == second == {"src/a.py": 2, "src/b.py": 1}
+    assert calls["log"] == 1  # second call served from the HEAD-keyed cache

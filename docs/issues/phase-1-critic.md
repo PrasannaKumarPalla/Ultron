@@ -33,29 +33,29 @@ impact. Top 10 fixed before tagging; the rest filed below.
     keep candidate on manual-checks (operator reviews), roll back only on
     explicit test failure. Documented here and in ADR-0003.
 
-## Filed (not fixed)
+## Filed — now tracked as GitHub issues
 
-11. Cancelled mid-candidate missions leave the workspace on the candidate
-    branch with uncommitted writes until the next `begin_candidate`. Kill
-    switch is operator-initiated; accepted for now.
-12. `mission_events` mirror stores spilled payloads inline again (double
-    storage for >64KiB events). Needs mirror truncation policy in phase 3
-    memory work.
-13. `verify_event_chain` loads all rows into memory; streaming cursor wanted
-    if single-run histories exceed ~100k events.
-14. Fork failures surface only as the fork's own FAILED transition; no
-    back-reference written to the source run.
-15. SSE payload shape changed (nullable `hash`/`parent_hash`/`blob_ref`
-    fields added). Current UI ignores unknown fields; noted as an API
-    surface change for any future external consumer.
-16. `changed_files()`/`diff_stat()` swallow git errors and return empty.
-17. `_open_candidate` emits `shadow.candidate_opened` even for read-only
-    missions (harmless audit noise).
-18. Benign TOCTOU between `BlobStore.has` and `get`; local-only tool.
-19. No blob GC: append-only store grows monotonically; consolidation job
-    (phase 3) must add retention.
-20. `event_timeline` returns raw ts strings rather than parsed datetimes,
-    inconsistent with other endpoints.
+The open items from this pass are tracked issues; this list is the historical
+record of where they came from.
+
+| # | Item | Issue |
+|---|---|---|
+| 11 | Cancelled mid-candidate missions strand the workspace on the candidate branch | [#13](https://github.com/PrasannaKumarPalla/Ultron/issues/13) |
+| 12 | `mission_events` mirror re-inlines spilled payloads (>64 KiB double-stored) | [#14](https://github.com/PrasannaKumarPalla/Ultron/issues/14) |
+| 13 | `verify_event_chain` loads all rows into memory | [#15](https://github.com/PrasannaKumarPalla/Ultron/issues/15) |
+| 14 | Fork failures write no back-reference to the source run | [#16](https://github.com/PrasannaKumarPalla/Ultron/issues/16) |
+| 16 | `changed_files()` / `diff_stat()` swallow git errors | [#17](https://github.com/PrasannaKumarPalla/Ultron/issues/17) |
+| 17 | `shadow.candidate_opened` emitted for read-only missions | [#18](https://github.com/PrasannaKumarPalla/Ultron/issues/18) |
+| 19 | Blob store has no GC / retention | [#19](https://github.com/PrasannaKumarPalla/Ultron/issues/19) |
+| 20 | `event_timeline` returns raw ts strings | [#20](https://github.com/PrasannaKumarPalla/Ultron/issues/20) |
+
+Not filed as issues (informational / accepted):
+
+- **15.** SSE payload gained nullable `hash`/`parent_hash`/`blob_ref` fields. The
+  UI ignores unknown fields; recorded as an API-surface note for any future
+  external consumer.
+- **18.** Benign TOCTOU between `BlobStore.has` and `get` — local-only tool,
+  single writer.
 
 ## Bench evidence (regenerated after fixes)
 
