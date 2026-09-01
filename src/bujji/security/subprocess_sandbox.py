@@ -115,6 +115,7 @@ def run_sandboxed(
     try:
         proc = subprocess.Popen(
             command,
+            # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true  -- this is the shell-exec / sandbox runner — a shell command string is the input by design
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

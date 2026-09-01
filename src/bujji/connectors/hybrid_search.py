@@ -236,6 +236,7 @@ class HybridSearch:
             LIMIT ?
         """
         try:
+            # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
             rows = self._store._conn.execute(
                 sql, [fts_query, *filter_params, self._recall_k]
             ).fetchall()
@@ -270,6 +271,7 @@ class HybridSearch:
             FROM knowledge_chunks
             WHERE embedding IS NOT NULL AND {filter_sql}
         """
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         rows = self._store._conn.execute(sql, filter_params).fetchall()
         if not rows:
             return []
@@ -428,6 +430,7 @@ class HybridSearch:
                 ORDER BY timestamp DESC, created_at DESC
                 LIMIT ?
             """
+            # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
             rows = self._store._conn.execute(
                 sql, [*unaliased_filter_params, limit]
             ).fetchall()
@@ -439,6 +442,7 @@ class HybridSearch:
             return []
         ids = [cid for cid, *_ in top]
         placeholders = ",".join("?" for _ in ids)
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         meta_rows = self._store._conn.execute(
             f"""
             SELECT id, doc_id, content, source, title, author, participants,

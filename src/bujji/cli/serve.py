@@ -748,6 +748,7 @@ def serve(
         if _set > 0:
             _cred_parts.append(f"{_tool_name}: {_set}/{_total} keys")
     if _cred_parts:
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
         logger.info("Credentials loaded â€” %s", ", ".join(_cred_parts))
 
     webhook_config = {

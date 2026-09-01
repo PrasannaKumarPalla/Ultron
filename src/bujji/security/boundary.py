@@ -97,6 +97,7 @@ class BoundaryGuard:
                     f"Secrets/PII detected in outbound content to {destination}"
                 )
             if self._mode == "warn":
+                # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
                 logger.warning(
                     "Secrets/PII detected in outbound content to %s", destination
                 )

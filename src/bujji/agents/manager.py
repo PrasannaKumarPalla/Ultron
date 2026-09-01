@@ -264,6 +264,7 @@ class AgentManager:
         sets.append("updated_at = ?")
         vals.append(time.time())
         vals.append(agent_id)
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         self._conn.execute(
             f"UPDATE managed_agents SET {', '.join(sets)} WHERE id = ?", vals
         )
@@ -443,6 +444,7 @@ class AgentManager:
         if not sets:
             return self._get_task(task_id)  # type: ignore[return-value]
         vals.append(task_id)
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         self._conn.execute(
             f"UPDATE agent_tasks SET {', '.join(sets)} WHERE id = ?", vals
         )
@@ -516,6 +518,7 @@ class AgentManager:
     @staticmethod
     def list_templates() -> List[Dict[str, Any]]:
         """Discover built-in and user templates."""
+        # nosemgrep: python.lang.compatibility.python37.python37-compatibility-importlib2  -- requires-python is >=3.12
         import importlib.resources
 
         try:

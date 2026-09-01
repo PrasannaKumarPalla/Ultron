@@ -76,6 +76,7 @@ class RLMRepl:
             try:
                 import importlib
 
+                # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
                 self._namespace[mod_name] = importlib.import_module(mod_name)
             except ImportError:
                 pass
@@ -215,6 +216,7 @@ class RLMRepl:
 
         try:
             with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                # nosemgrep: python.lang.security.audit.exec-detected.exec-detected  -- this is the REPL/sandbox tool — running submitted code is its function
                 exec(code, self._namespace)  # noqa: S102
         except Exception as exc:
             error_msg = f"{type(exc).__name__}: {exc}"

@@ -5,6 +5,7 @@ import importlib
 # Optional STT backends — each registers itself via @SpeechRegistry.register()
 for _mod in ("faster_whisper", "openai_whisper", "deepgram"):
     try:
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
         importlib.import_module(f".{_mod}", __name__)
     except ImportError:
         pass
@@ -19,6 +20,7 @@ for _mod in (
     "mms_tts",
 ):
     try:
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
         importlib.import_module(f".{_mod}", __name__)
     except ImportError:
         pass

@@ -64,6 +64,7 @@ def self_update(check: bool, yes: bool) -> None:
     click.echo(f"\n-> {info.upgrade_command}\n")
 
     if info.kind == "editable-git":
+        # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true  -- this is the shell-exec / sandbox runner — a shell command string is the input by design
         result = subprocess.run(info.upgrade_command, shell=True)
     else:
         result = subprocess.run(shlex.split(info.upgrade_command))

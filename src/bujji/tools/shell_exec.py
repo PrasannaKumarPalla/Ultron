@@ -154,6 +154,7 @@ class ShellExecTool(BaseTool):
         try:
             result = subprocess.run(
                 command,
+                # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true  -- this is the shell-exec / sandbox runner — a shell command string is the input by design
                 shell=True,
                 capture_output=True,
                 text=True,

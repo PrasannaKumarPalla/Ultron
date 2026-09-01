@@ -219,6 +219,7 @@ def _ensure_registries_populated() -> None:
     # Also try to import browser tools (not included in bujji.tools.__init__)
     for _browser_mod in ("bujji.tools.browser", "bujji.tools.browser_axtree"):
         try:
+            # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
             importlib.import_module(_browser_mod)
         except Exception:
             pass

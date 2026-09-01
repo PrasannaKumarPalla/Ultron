@@ -233,6 +233,7 @@ class OllamaEngine(InferenceEngine):
                 fn = tc.get("function", {})
                 raw_args = fn.get("arguments", "{}")
                 if _is_control_token_only_args(raw_args):
+                    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
                     logger.warning(
                         "Dropping Qwen3 control-token tool call %s(%r)",
                         fn.get("name", ""),
@@ -416,6 +417,7 @@ class OllamaEngine(InferenceEngine):
                             fn = tc.get("function", {}) or {}
                             raw_args = fn.get("arguments", "{}")
                             if _is_control_token_only_args(raw_args):
+                                # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
                                 logger.warning(
                                     "Dropping Qwen3 control-token tool call %s(%r)",
                                     fn.get("name", ""),

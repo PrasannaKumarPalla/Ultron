@@ -192,6 +192,7 @@ class TraceStore:
         where = " AND ".join(clauses) if clauses else "1=1"
         sql = f"SELECT * FROM traces WHERE {where} ORDER BY started_at DESC LIMIT ?"
         params.append(limit)
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         rows = self._conn.execute(sql, params).fetchall()
         return [self._row_to_trace(r) for r in rows]
 

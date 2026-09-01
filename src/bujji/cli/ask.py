@@ -854,6 +854,7 @@ def ask(
             model_name,
         )
         max_tokens = max(suggested, config.intelligence.max_tokens)
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
         logger.debug(
             "Using complexity-suggested max_tokens=%d (model=%s)",
             max_tokens,

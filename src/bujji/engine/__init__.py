@@ -17,6 +17,7 @@ from bujji.engine._discovery import discover_engines, discover_models, get_engin
 # Optional engines â€” only register if their SDK deps are present
 for _optional in ("cloud", "litellm", "gemma_cpp"):
     try:
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
         importlib.import_module(f".{_optional}", __name__)
     except ImportError:
         pass

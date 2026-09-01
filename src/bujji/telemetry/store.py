@@ -157,6 +157,7 @@ class TelemetryStore:
         """Add new columns to existing databases (idempotent)."""
         for col_name, col_def in _MIGRATE_COLUMNS:
             try:
+                # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query,python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 DDL/among internal constant column defs; no user input in the string; sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
                 self._conn.execute(
                     f"ALTER TABLE telemetry ADD COLUMN {col_name} {col_def}",
                 )

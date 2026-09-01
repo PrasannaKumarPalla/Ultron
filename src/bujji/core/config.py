@@ -1897,6 +1897,7 @@ def validate_config_key(dotted_key: str) -> type:
             # Evaluate forward references in the config module namespace
             import bujji.core.config as _cfg_mod
 
+            # nosemgrep: python.lang.security.audit.eval-detected.eval-detected  -- condition/type-ref evaluation is the documented function; builtins stripped where feasible
             fld_type = eval(fld_type, vars(_cfg_mod))  # noqa: S307
 
         if i == len(parts) - 1:

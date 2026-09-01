@@ -69,7 +69,7 @@ class AttachmentStore:
 
     def _setup(self) -> None:
         self._conn.execute("PRAGMA journal_mode=WAL;")
-        self._conn.execute(f"{_CREATE_TABLE}")
+        self._conn.execute(_CREATE_TABLE)
         self._conn.commit()
 
     # ------------------------------------------------------------------

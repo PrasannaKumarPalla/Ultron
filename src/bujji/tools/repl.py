@@ -312,12 +312,14 @@ class ReplTool(BaseTool):
                     # Try eval first for expression display (REPL-like behavior)
                     try:
                         compiled = compile(code, "<repl>", "eval")
+                        # nosemgrep: python.lang.security.audit.eval-detected.eval-detected  -- this is the REPL tool — evaluating submitted expressions is its function
                         val = eval(compiled, session.namespace)  # noqa: S307
                         if val is not None:
                             print(repr(val))  # noqa: T201
                     except SyntaxError:
                         # Not an expression â€” execute as statements
                         compiled = compile(code, "<repl>", "exec")
+                        # nosemgrep: python.lang.security.audit.exec-detected.exec-detected  -- this is the REPL/sandbox tool — running submitted code is its function
                         exec(compiled, session.namespace)  # noqa: S102
             except Exception as exc:
                 result_holder["output"] = f"{type(exc).__name__}: {exc}"

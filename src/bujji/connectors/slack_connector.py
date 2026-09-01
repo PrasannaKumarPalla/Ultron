@@ -401,6 +401,7 @@ class SlackConnector(BaseConnector):
             _validate_user_token(token)
         except SlackTokenError as exc:
             self._last_error = str(exc)
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
             logger.warning("Slack sync rejected token: %s", exc)
             return
 
