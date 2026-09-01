@@ -22,6 +22,50 @@ JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x100
 JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x8
 PROCESS_SET_QUOTA = 0x0100
 PROCESS_TERMINATE = 0x0001
+CREATE_SUSPENDED = 0x00000004
+TH32CS_SNAPTHREAD = 0x00000004
+THREAD_SUSPEND_RESUME = 0x0002
+
+
+def _resume_process_threads(pid: int) -> None:
+    """Resume every thread of a CREATE_SUSPENDED child.
+
+    A process spawned suspended has exactly its primary thread; walking the
+    toolhelp snapshot avoids needing the raw thread handle that subprocess
+    does not expose.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+
+    class THREADENTRY32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ThreadID", wintypes.DWORD),
+            ("th32OwnerProcessID", wintypes.DWORD),
+            ("tpBasePri", ctypes.c_long),
+            ("tpDeltaPri", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+        ]
+
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+    if snapshot == -1:
+        return
+    try:
+        entry = THREADENTRY32()
+        entry.dwSize = ctypes.sizeof(THREADENTRY32)
+        ok = kernel32.Thread32First(snapshot, ctypes.byref(entry))
+        while ok:
+            if entry.th32OwnerProcessID == pid:
+                thread = kernel32.OpenThread(THREAD_SUSPEND_RESUME, False, entry.th32ThreadID)
+                if thread:
+                    kernel32.ResumeThread(thread)
+                    kernel32.CloseHandle(thread)
+            ok = kernel32.Thread32Next(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
 
 
 def _is_windows() -> bool:
@@ -82,13 +126,18 @@ def sandboxed_run(command: list[str], cwd: Path, timeout_s: int = 180,
             pass  # degraded: job still enforces kill-on-close
 
         # requires-python is >=3.12; the py36/py37 Popen-arg compat rules do not apply.
+        # Spawn suspended so the child is assigned to the job before it runs a
+        # single instruction — otherwise it has a first-ms window to fork
+        # escapees or touch the filesystem before the job cap applies.
         completed = subprocess.Popen(command, cwd=str(cwd), stdout=subprocess.PIPE,  # nosemgrep: python.lang.compatibility.python36.python36-compatibility-Popen1,python.lang.compatibility.python36.python36-compatibility-Popen2,python.lang.compatibility.python37.python37-compatibility-Popen1,python.lang.compatibility.python37.python37-compatibility-Popen2
                                      stderr=subprocess.STDOUT, text=True,
-                                     encoding="utf-8", errors="replace")
+                                     encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_SUSPENDED)
         process = kernel32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, completed.pid)
         if process:
             kernel32.AssignProcessToJobObject(job, process)
             kernel32.CloseHandle(process)
+        _resume_process_threads(completed.pid)
 
         try:
             out, _ = completed.communicate(timeout=timeout_s)
