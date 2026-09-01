@@ -86,6 +86,11 @@ class ModelSelection(BaseModel):
     model: str = Field(min_length=2, max_length=200)
 
 
+class PreflightInstall(BaseModel):
+    action: str = Field(min_length=3, max_length=100,
+                        description='"install_ollama" or "pull_model:<tag>" from a PrereqReport')
+
+
 class MissionControl(BaseModel):
     reason: str = Field(default="Operator control", min_length=2, max_length=1000)
 

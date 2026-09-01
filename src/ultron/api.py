@@ -22,7 +22,7 @@ from .db import Repository
 from .models import (Approval, ApprovalCreate, ApprovalDecisionRequest, ChatMessage, ChatMessageCreate, ChatSession,
     ChatSessionCreate, EventKind, FileSnapshot, ForkRunCreate, HealthReport,
     MemoryCreate, MemoryRecord, MemorySupersede, Mission, MissionControl, MissionCreate, MissionEvent,
-    MissionStatus, ModelSelection, Project, ProjectCreate, AssistantListenCreate, BujjiChatCreate, RunEvent, TeamMember, WorkspaceDelete)
+    MissionStatus, ModelSelection, PreflightInstall, Project, ProjectCreate, AssistantListenCreate, BujjiChatCreate, RunEvent, TeamMember, WorkspaceDelete)
 from .providers import MockExecutionProvider, OpenHandsExecutionProvider, ollama_health, ollama_models
 from .agent_runtime import OllamaAgentStudio, WorkspaceGuard
 from .chat_engine import ChatEngine
@@ -272,6 +272,41 @@ async def select_active_model(request: ModelSelection, repo: Repository = Depend
         raise HTTPException(404, "That model is not installed in Ollama")
     repo.set_setting("active_model", request.model)
     return {"active": request.model, "applies_to": "newly started projects"}
+
+
+@app.get("/api/preflight")
+async def preflight_report(settings: Settings = Depends(get_settings)):
+    """Machine profile + prerequisite report for Ultron + the bujji subsystem."""
+    from . import preflight
+
+    profile = await asyncio.to_thread(preflight.detect_machine)
+    return preflight.to_dict(preflight.resolve(profile))
+
+
+@app.post("/api/preflight/install")
+async def preflight_install(request: PreflightInstall,
+                            settings: Settings = Depends(get_settings)):
+    """Run one consented prerequisite action, streaming progress as SSE frames."""
+    from .preflight_install import InvalidAction, run_install
+
+    downloads_dir = Path(settings.database_path).parent / "downloads"
+
+    async def generate():
+        try:
+            async for event in run_install(
+                request.action, base_url=settings.ollama_url, downloads_dir=downloads_dir
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except InvalidAction as exc:
+            yield f"data: {json.dumps({'phase': 'error', 'error': str(exc)})}\n\n"
+        except Exception as exc:  # surface any install failure to the UI, don't 500 mid-stream
+            logging.exception("preflight install failed")
+            yield f"data: {json.dumps({'phase': 'error', 'error': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        generate(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/providers")
