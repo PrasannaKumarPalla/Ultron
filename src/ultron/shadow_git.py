@@ -72,8 +72,22 @@ class ShadowGit:
         code, _ = self._git("rev-parse", "--verify", "HEAD")
         if code != 0:
             self.commit_all("ultron baseline", allow_empty=True)
+        self._recover_stranded_branch()
         self.available = True
         return True
+
+    def _recover_stranded_branch(self) -> None:
+        """A crash between a variant checkout and forward_variant/rollback leaves
+        the workspace on a candidate branch. Every mission starts from main, so
+        detect that state here and reset to baseline before handing back."""
+        current = self.branch()
+        if not current or current == MAIN_BRANCH:
+            return
+        if current == CANDIDATE_BRANCH or current.startswith(f"{CANDIDATE_BRANCH}-"):
+            logger.warning("shadow-git: workspace stranded on %s; resetting to %s",
+                           current, MAIN_BRANCH)
+            self._git("checkout", "-f", MAIN_BRANCH)
+            self._git("reset", "--hard")
 
     def head(self) -> str | None:
         code, out = self._git("rev-parse", "--verify", "HEAD")

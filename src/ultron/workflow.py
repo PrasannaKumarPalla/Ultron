@@ -93,6 +93,20 @@ class DurableMissionWorkflow:
 
         return wrapped
 
+    def _rollback_open_candidates(self, run_id: str) -> None:
+        """On cancel, restore every workspace still sitting on a candidate branch."""
+        for shadow in getattr(self, "_shadow_cache", {}).values():
+            if not getattr(shadow, "available", False):
+                continue
+            branch = shadow.branch()
+            if branch and branch != "main":
+                try:
+                    shadow.rollback()
+                    self._emit(run_id, "shadow.rolled_back", "shadow-git",
+                               {"reason": "run cancelled; workspace restored to baseline"})
+                except ShadowGitError as exc:
+                    self._emit(run_id, "shadow.unavailable", "shadow-git", {"reason": str(exc)})
+
     async def _execute(self, mission: Mission, initial: dict | None, *, resume: bool) -> Mission:
         config = {"configurable": {"thread_id": mission.id}, "recursion_limit": 30}
         self._emit(mission.id, EventKind.RUN_STARTED, "supervisor",
@@ -109,6 +123,7 @@ class DurableMissionWorkflow:
                 else:
                     await graph.ainvoke(initial, config)
         except RunCancelled:
+            self._rollback_open_candidates(mission.id)
             self._emit(mission.id, EventKind.RUN_CANCELLED, "supervisor", {})
             raise
         except Exception as exc:
