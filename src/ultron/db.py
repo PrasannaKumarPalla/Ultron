@@ -497,11 +497,20 @@ class Repository:
             raise KeyError(mission_id)
         return mission
 
+    def _encode_payload(self, payload: dict) -> str:
+        """JSON-encode a payload, spilling anything over the threshold to the blob
+        store and leaving a {"blob", "size", "preview"} marker in its place."""
+        encoded = json.dumps(payload)
+        if len(encoded) > BLOB_SPILL_THRESHOLD:
+            ref = self.blobs.put_text(encoded)
+            return json.dumps({"blob": ref, "size": len(encoded), "preview": encoded[:512]})
+        return encoded
+
     def add_event(self, mission_id: str, kind: str, actor: str, payload: dict) -> None:
         with self.connect() as db:
             db.execute(
                 "INSERT INTO mission_events(mission_id,kind,actor,payload,created_at) VALUES(?,?,?,?,?)",
-                (mission_id, kind, actor, json.dumps(payload), utcnow().isoformat()),
+                (mission_id, kind, actor, self._encode_payload(payload), utcnow().isoformat()),
             )
 
     def events(self, mission_id: str) -> list[MissionEvent]:
@@ -513,7 +522,7 @@ class Repository:
         return [
             MissionEvent(
                 id=row["id"], mission_id=row["mission_id"], kind=row["kind"],
-                actor=row["actor"], payload=json.loads(row["payload"]),
+                actor=row["actor"], payload=self._decode_payload(row["payload"]),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
             for row in rows
@@ -528,7 +537,7 @@ class Repository:
         return [
             MissionEvent(
                 id=row["id"], mission_id=row["mission_id"], kind=row["kind"],
-                actor=row["actor"], payload=json.loads(row["payload"]),
+                actor=row["actor"], payload=self._decode_payload(row["payload"]),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
             for row in rows
@@ -546,12 +555,11 @@ class Repository:
 
     def append_run_event(self, run_id: str, kind: str, agent: str, payload: dict) -> RunEvent:
         ts = utcnow()
-        encoded = json.dumps(payload)
+        encoded = self._encode_payload(payload)
         blob_ref: str | None = None
-        if len(encoded) > BLOB_SPILL_THRESHOLD:
-            blob_ref = self.blobs.put_text(encoded)
-            encoded = json.dumps({"blob": blob_ref, "size": len(encoded),
-                                  "preview": encoded[:512]})
+        marker = json.loads(encoded)
+        if isinstance(marker, dict) and isinstance(marker.get("blob"), str):
+            blob_ref = marker["blob"]
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             parent_row = db.execute(
