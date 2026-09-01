@@ -161,10 +161,10 @@ def _detect_gpu() -> tuple[float | None, str | None]:
                 )
                 if ram >= best_ram:
                     best_ram, vendor = ram, this_vendor or vendor
-            # AdapterRAM is a signed 32-bit field: it saturates/negatives past 4 GB and is
-            # unreliable for modern cards. Report the vendor but not a bogus VRAM number.
-            vram = round(best_ram / 1024**3, 1) if 0 < best_ram < 4 * 1024**3 else None
-            return vram, vendor
+            # AdapterRAM is a signed 32-bit field that saturates past 4 GB and lies on
+            # modern cards. Only nvidia-smi (handled above) gives a VRAM figure worth
+            # trusting; from the CIM fallback, report the vendor only.
+            return None, vendor
         except (OSError, subprocess.SubprocessError, ValueError) as exc:  # pragma: no cover
             logger.debug("Win32_VideoController query failed: %s", exc)
 
