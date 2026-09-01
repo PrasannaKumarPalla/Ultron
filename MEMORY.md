@@ -3,9 +3,12 @@
 Running log of decisions, gotchas, state. Not auto-loaded by Claude's global
 memory system — read this at session start when working in this repo.
 
-## Current state (2026-08-30)
-- Branch: `main`. Tags: `phase-0` (backfilled) → `phase-6`. Post-phase-6
-  work is on `main` untagged; next tag will be `v0.1.0` on release cut.
+## Current state (2026-09-01)
+- Public repo: `PrasannaKumarPalla/Ultron`, **AGPL-3.0**. Started from a single
+  squashed root commit; pre-public history is in the retired private repo.
+- `main` is protected by a ruleset: PR required, signed commits, linear history,
+  required checks `test`/`semgrep`/`trufflehog`, squash-only. DCO on every commit.
+- Tags: `phase-0` (backfilled) → `phase-6`; `v0.1.0` is the first public release.
 - Suite: **244 tests passing, 1 skipped**. PyInstaller build produces
   `dist/Ultron.exe` (~41 MB); CI is green on Windows.
 - Distribution: NSIS installer (`installer/ultron.nsi`) + release workflow
