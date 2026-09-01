@@ -1,0 +1,51 @@
+name: Semgrep SAST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # No static baseline to bump. Each event scans only what it introduced:
+      #   - pull_request: everything new relative to the PR base
+      #   - push to main: everything new since the previous main tip
+      #   - schedule (weekly): the whole tree, as a full audit
+      # `--error` fails the build on any finding in that scope.
+      #
+      # The absorbed src/bujji framework carries a pre-existing p/default backlog
+      # (eval/exec/subprocess — inherent to a code-execution agent). The delta
+      # scans keep it out of the gate; the weekly full run keeps it visible.
+      # SARIF -> GitHub code scanning is not wired yet; add if triage volume grows.
+      - name: Run Semgrep
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=""
+          case "${{ github.event_name }}" in
+            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
+            push)         base="${{ github.event.before }}" ;;
+          esac
+          args=(--config p/default --error --skip-unknown-extensions)
+          if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            args+=(--baseline-commit "$base")
+            echo "Scanning changes since $base"
+          else
+            echo "No usable baseline ($base) — scanning the full tree"
+          fi
+          semgrep scan "${args[@]}"

@@ -1,0 +1,20 @@
+# Semgrep scan scope — see .github/workflows/semgrep.yml (baseline-gated).
+
+# Historical archive of the pre-absorption B.U.J.J.I tree. Kept for provenance
+# only; the live code lives under src/bujji/. Scanning both doubles every finding.
+subsystems/
+
+# Built / vendored / minified assets — not our source.
+src/bujji/server/static/
+**/*.min.js
+**/assets/index-*.js
+vendor/
+dist/
+build/
+node_modules/
+.venv/
+*.egg-info/
+
+# Test fixtures and generated projects.
+**/__pycache__/
+.worktrees/

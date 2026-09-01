@@ -1,0 +1,9 @@
+# Default owner for everything.
+* @PrasannaKumarPalla
+
+# Maintainer-owned - not modifiable via community PRs.
+/LICENSE                       @PrasannaKumarPalla
+/.github/                      @PrasannaKumarPalla
+/installer/                    @PrasannaKumarPalla
+/.github/workflows/release.yml @PrasannaKumarPalla
+/pyproject.toml                @PrasannaKumarPalla
