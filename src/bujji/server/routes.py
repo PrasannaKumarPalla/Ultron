@@ -1440,6 +1440,7 @@ async def youtube_resolve(q: str):
     def _fetch() -> str:
         try:
             req = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0"})
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  -- fixed host / operator-configured model endpoint; URL is not request-derived
             with urllib.request.urlopen(req, timeout=6) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
             match = re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"', html)

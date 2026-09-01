@@ -88,6 +88,7 @@ class EmbeddingStore:
         filename = f"{chunk_id}.pt"
         tensor_path = self._tensor_dir / filename
 
+        # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch  -- first-party local tensors; load path pins weights_only=True
         _torch.save(embedding, str(tensor_path))
 
         self._conn.execute(
@@ -125,6 +126,7 @@ class EmbeddingStore:
             return None
 
         try:
+            # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch  -- first-party local tensors; load path pins weights_only=True
             return _torch.load(str(tensor_path), weights_only=True)
         except Exception as exc:
             logger.warning(

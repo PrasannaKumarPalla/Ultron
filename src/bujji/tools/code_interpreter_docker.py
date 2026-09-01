@@ -81,6 +81,7 @@ class DockerCodeInterpreterTool(BaseTool):
         try:
             client = docker.from_env()
 
+            # nosemgrep: python.docker.security.audit.docker-arbitrary-container-run.docker-arbitrary-container-run  -- the Docker code-interpreter tool; containerised run is the safer execution path
             container = client.containers.run(
                 self._image,
                 ["python", "-c", code],

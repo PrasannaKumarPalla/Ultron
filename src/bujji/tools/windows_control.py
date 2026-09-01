@@ -241,7 +241,13 @@ class WindowsControlTool(BaseTool):
         if not name:
             return ToolResult(tool_name=self.tool_id, content="'name' required", success=False)
         try:
-            subprocess.Popen(name, shell=True)
+            # os.startfile resolves app names / paths / documents via the shell
+            # file-association layer without spawning a command interpreter, so
+            # a name like "notepad & del x" cannot inject a second command.
+            try:
+                os.startfile(name)  # noqa: S606  (Windows-only, no shell)
+            except OSError:
+                subprocess.Popen([name])
             return ToolResult(tool_name=self.tool_id, content=f"Launched: {name}", success=True)
         except Exception as exc:
             return ToolResult(tool_name=self.tool_id, content=f"launch_app failed: {exc}", success=False)

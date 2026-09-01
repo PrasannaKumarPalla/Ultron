@@ -86,6 +86,7 @@ def refresh_access_token(credentials_path: str) -> str:
     if "expires_in" in payload:
         tokens["expires_in"] = payload["expires_in"]
     save_tokens(credentials_path, tokens)
+    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure  -- logs counts / identifiers / exception type only, never a secret value
     logger.info(
         "Refreshed Google access token (expires_in=%s)", payload.get("expires_in")
     )

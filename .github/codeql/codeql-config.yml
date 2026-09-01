@@ -1,7 +1,8 @@
-# CodeQL scope. The blocking-quality surface is src/ultron. The absorbed
-# src/bujji subsystem (a code-execution agent — connectors, routers, channels)
-# has an inherent security-extended backlog; it is triaged separately, not
-# gated on every push. Tests are excluded.
+# CodeQL scope: src/ultron. The absorbed src/bujji subsystem is covered by the
+# blocking Semgrep p/default gate (src/ultron + src/bujji) plus the weekly
+# full-tree audit; CodeQL security-extended dataflow over its connectors /
+# channels / browser tooling is mostly framework noise, so it stays out of
+# scope here by decision (issue #27). Tests are excluded.
 name: "Ultron CodeQL config"
 paths:
   - src/ultron

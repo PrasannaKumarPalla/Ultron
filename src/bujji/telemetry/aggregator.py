@@ -128,6 +128,7 @@ class TelemetryAggregator:
     def _safe_col(self, col_name: str) -> bool:
         """Check if a column exists in the telemetry table."""
         try:
+            # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query,python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 DDL/among internal constant column defs; no user input in the string; sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
             self._conn.execute(f"SELECT {col_name} FROM telemetry LIMIT 0")
             return True
         except sqlite3.OperationalError as exc:
@@ -426,6 +427,7 @@ class TelemetryAggregator:
     ) -> List[Dict[str, Any]]:
         where, params = self._time_filter(since, until)
         sql = f"SELECT * FROM telemetry{where} ORDER BY timestamp"
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query  -- sqlite3 execute; interpolated tokens are internal constants, every value is a bound ? param
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 

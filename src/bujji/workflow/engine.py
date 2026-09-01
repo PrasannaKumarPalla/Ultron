@@ -277,6 +277,7 @@ class WorkflowEngine:
         # Simple expression evaluation â€” check if key exists and is truthy
         # Supports: "node_id.success", "node_id.output contains 'text'"
         try:
+            # nosemgrep: python.lang.security.audit.eval-detected.eval-detected  -- condition/type-ref evaluation is the documented function; builtins stripped where feasible
             result = str(eval(expr, {"__builtins__": {}}, {"outputs": outputs}))  # noqa: S307
         except Exception:
             result = "false"

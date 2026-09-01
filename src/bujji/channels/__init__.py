@@ -46,6 +46,7 @@ _CHANNEL_MODULES = [
 
 for _mod in _CHANNEL_MODULES:
     try:
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import  -- plugin loader over a fixed in-source module tuple; names are not user input
         importlib.import_module(f".{_mod}", __name__)
     except ImportError:
         pass

@@ -176,6 +176,7 @@ def _parse_plan(text: str, n_workers: int):
 
 def _vllm_alive(base_url: str) -> bool:
     try:
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  -- fixed host / operator-configured model endpoint; URL is not request-derived
         with urllib.request.urlopen(
             base_url.rstrip("/") + "/models", timeout=3
         ) as r:

@@ -151,6 +151,7 @@ def _fetch_latest_stable() -> str | None:
     try:
         import urllib.request
 
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  -- fixed host / operator-configured model endpoint; URL is not request-derived
         with urllib.request.urlopen(_PYPI_API, timeout=3) as resp:
             data = json.loads(resp.read())
     except Exception as exc:

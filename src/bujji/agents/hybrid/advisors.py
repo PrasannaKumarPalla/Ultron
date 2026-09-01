@@ -80,6 +80,7 @@ def _resolve_local_model(endpoint: str, registry_model: str) -> str:
     a model id (e.g. ``Qwen3.5-9B``) that's different from what's loaded.
     """
     try:
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected  -- fixed host / operator-configured model endpoint; URL is not request-derived
         with urllib.request.urlopen(
             endpoint.rstrip("/") + "/models", timeout=5
         ) as r:
